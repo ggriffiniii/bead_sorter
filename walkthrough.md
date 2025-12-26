@@ -18,6 +18,7 @@ We have implemented three core drivers in the `app` crate:
         -   **Chutes**: pulse width constrained to 500-1167 µs.
     -   **Safety**: Includes `min_us` and `max_us` clamping in the `set_pulse_width` method.
     -   **Smooth Movement**: Implements `move_to` async method with cubic easing to prevent jerky motion.
+    -   **Sorting Logic**: Implements a `Pickup -> Camera -> Drop` sequence for the Hopper and maps 30 virtual tube positions to the Chutes servo range.
 
 3.  **Pause Switch (GPIO19)**
     -   **Implementation**: Uses `embassy-rp`'s `Input` driver with internal Pull-Up resistor.

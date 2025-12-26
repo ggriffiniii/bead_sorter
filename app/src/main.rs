@@ -13,8 +13,10 @@ use embassy_rp::usb;
 use embassy_time::{with_timeout, Duration, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use smart_leds::{SmartLedsWrite, RGB8};
+// extern crate alloc;
 use {defmt_rtt as _, panic_probe as _};
 
+// mod camera;
 mod neopixel;
 mod servo;
 mod switch;
@@ -27,12 +29,29 @@ use bead_sorter_bsp::Board;
 const HOPPER_MIN: u16 = 567;
 const HOPPER_MAX: u16 = 2266;
 
+// Hopper States
+const HOPPER_PICKUP_POS: u16 = 900;
+const HOPPER_CAMERA_POS: u16 = 1580;
+const HOPPER_ROW_POSITIONS: [u16; 4] = [2240, 2107, 1994, 1914];
+const HOPPER_DROP_POS: u16 = 1700;
+
 const CHUTES_MIN: u16 = 500;
 const CHUTES_MAX: u16 = 1167;
+const TUBE_COUNT: u8 = 30;
+
+const CHUTE_SLICE_POSITIONS: [u16; 15] = [
+    544, 589, 633, 678, 722, 767, 811, 856, 900, 945, 989, 1034, 1078, 1123, 1167,
+];
+
+fn get_chute_pos(index: u8) -> u16 {
+    let slice_idx = index as usize % 15;
+    CHUTE_SLICE_POSITIONS[slice_idx]
+}
 
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => usb::InterruptHandler<USB>;
     PIO0_IRQ_0 => embassy_rp::pio::InterruptHandler<PIO0>;
+    // I2C0_IRQ => embassy_rp::i2c::InterruptHandler<embassy_rp::peripherals::I2C0>;
 });
 
 #[embassy_executor::main]
@@ -113,12 +132,39 @@ async fn main(spawner: Spawner) {
     let cam_led_pin = unsafe { embassy_rp::peripherals::PIN_23::steal() };
     let mut led = Output::new(cam_led_pin, Level::Low);
 
+    // 5. Camera SCCB (I2C0: SDA=GPIO12, SCL=GPIO13)
+    /*
+    let sda = unsafe { embassy_rp::peripherals::PIN_12::steal() };
+    let scl = unsafe { embassy_rp::peripherals::PIN_13::steal() };
+    let i2c0 = unsafe { embassy_rp::peripherals::I2C0::steal() };
+
+    let i2c =
+        embassy_rp::i2c::I2c::new_async(i2c0, scl, sda, Irqs, embassy_rp::i2c::Config::default());
+    let mut sccb = crate::camera::sccb::Sccb::new(i2c);
+    */
+
     // --- Tasks ---
     let usb_fut = usb.run();
 
     let demo_fut = async {
         // Wait for USB
         Timer::after(Duration::from_millis(1000)).await;
+
+        // Camera Presence Check
+        /*
+        match sccb.read_reg(0x0A).await {
+            Ok(pid) => {
+                let _ = class
+                    .write_packet(
+                        alloc::format!("Camera Connected! PID: {:02x}\r\n", pid).as_bytes(),
+                    )
+                    .await;
+            }
+            Err(e) => {
+                let _ = class.write_packet(b"Camera connect failed\r\n").await;
+            }
+        }
+        */
 
         loop {
             if switch.is_active() {
@@ -137,29 +183,45 @@ async fn main(spawner: Spawner) {
                             .await;
                 }
 
-                // Demo routine
-                // Move to "Start" positions (e.g. Min)
+                // Sorting Sequence Demo
+
+                // 1. Pickup Bead
+                // let _ = class.write_packet(b"Pickup\r\n").await;
                 hopper
-                    .move_to(HOPPER_MIN, Duration::from_millis(1000))
+                    .move_to(HOPPER_PICKUP_POS, Duration::from_millis(500))
                     .await;
-                chutes
-                    .move_to(CHUTES_MIN, Duration::from_millis(1000))
-                    .await;
+                Timer::after(Duration::from_millis(200)).await; // Wait for bead pickup
 
-                neopixel.write(&[RGB8::new(20, 0, 0)]).await; // Red
-                Timer::after(Duration::from_millis(500)).await;
-
-                // Move to "End" positions (e.g. Max)
+                // 2. Move to Camera
+                // let _ = class.write_packet(b"Inspect\r\n").await;
                 hopper
-                    .move_to(HOPPER_MAX, Duration::from_millis(1000))
+                    .move_to(HOPPER_CAMERA_POS, Duration::from_millis(500))
                     .await;
-                // For chutes, demonstrate a mid-point or full range
+                Timer::after(Duration::from_millis(200)).await; // Simulate picture snap time
+
+                // 3. Classify & Select Chute
+                let timestamp = embassy_time::Instant::now().as_millis();
+                let tube_index = ((timestamp / 1000) % 30) as u8; // Cycle through tubes based on time
+
+                // let msg = alloc::format!("Target Chute: {}\r\n", tube_index);
+                // let _ = class.write_packet(msg.as_bytes()).await;
+
+                let chute_target = get_chute_pos(tube_index);
                 chutes
-                    .move_to(CHUTES_MAX, Duration::from_millis(1000))
+                    .move_to(chute_target, Duration::from_millis(500))
                     .await;
 
-                neopixel.write(&[RGB8::new(0, 0, 20)]).await; // Blue
-                Timer::after(Duration::from_millis(500)).await;
+                neopixel.write(&[RGB8::new(0, 20, 0)]).await; // Green indicates "Classified"
+
+                // 4. Drop Bead
+                // let _ = class.write_packet(b"Drop\r\n").await;
+                hopper
+                    .move_to(HOPPER_DROP_POS, Duration::from_millis(500))
+                    .await;
+                Timer::after(Duration::from_millis(200)).await; // Wait for drop
+
+                // Reset indicator
+                neopixel.write(&[RGB8::new(0, 0, 0)]).await;
             }
             Timer::after(Duration::from_millis(100)).await;
         }
