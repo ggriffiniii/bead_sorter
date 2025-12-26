@@ -72,11 +72,13 @@ dependencies = [
  "embassy-rp",
  "embassy-time",
  "embassy-usb",
+ "fixed",
  "futures",
  "heapless",
  "log",
  "panic-probe",
  "rp2040-boot2",
+ "smart-leds",
 ]
 
 [[package]]

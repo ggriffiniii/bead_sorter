@@ -20,6 +20,8 @@ cortex-m = "0.7.7"
 cortex-m-rt = "0.7.3"
 futures = { version = "0.3.30", default-features = false, features = ["async-await"] }
 heapless = "0.8"
+smart-leds = "0.4"
+fixed = "1.27"
 
 [[bin]]
 name = "bead_sorter_app"

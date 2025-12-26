@@ -4,7 +4,6 @@ pub use embassy_rp;
 use embassy_rp::i2c;
 use embassy_rp::peripherals;
 use embassy_rp::Peri;
-
 pub type Neopixel = Peri<'static, peripherals::PIN_20>;
 pub type CameraLed = Peri<'static, peripherals::PIN_23>;
 pub type PauseButton = Peri<'static, peripherals::PIN_19>;
@@ -52,6 +51,12 @@ pub struct Board {
     pub hopper_servo: HopperServo,
     pub chutes_servo: ChutesServo,
 
+    pub neopixel_pio: Peri<'static, peripherals::PIO0>,
+    pub neopixel_dma: Peri<'static, peripherals::DMA_CH0>,
+
+    pub hopper_pwm: Peri<'static, peripherals::PWM_SLICE1>,
+    pub chutes_pwm: Peri<'static, peripherals::PWM_SLICE5>,
+
     pub i2c0: Peri<'static, peripherals::I2C0>,
     pub i2c_sda: Peri<'static, I2cData>,
     pub i2c_scl: Peri<'static, I2cClock>,
@@ -69,6 +74,11 @@ impl Board {
             pause_button: p.PIN_19,
             hopper_servo: p.PIN_18,
             chutes_servo: p.PIN_26,
+
+            neopixel_pio: p.PIO0,
+            neopixel_dma: p.DMA_CH0,
+            hopper_pwm: p.PWM_SLICE1,
+            chutes_pwm: p.PWM_SLICE5,
 
             i2c0: p.I2C0,
             i2c_sda: p.PIN_12,
