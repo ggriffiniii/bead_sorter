@@ -1,0 +1,14 @@
+[package]
+name = "bead_sorter_bsp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.3"
+embassy-rp = { git = "https://github.com/embassy-rs/embassy", features = ["defmt", "time-driver", "critical-section-impl", "rp2040"] }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy", features = ["defmt"] }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-usb = { git = "https://github.com/embassy-rs/embassy", features = ["defmt"] }
+defmt = "0.3"
+panic-probe = { version = "0.3", features = ["print-defmt"] }
