@@ -1,3 +1,15 @@
+use embassy_rp::dma::Channel;
+use embassy_rp::i2c::{Async, I2c, Instance as I2cInstance};
+use embassy_rp::peripherals::PWM_SLICE4;
+use embassy_rp::pio::{Common, Instance as PioInstance, StateMachine};
+use embassy_rp::pwm::{Config as PwmConfig, Pwm};
+use embassy_rp::Peri;
+// use embedded_hal_async::i2c::I2c as I2cTrait; // Unused
+
+use crate::camera::dvp::Dvp;
+use crate::camera::sccb::Sccb;
+use bead_sorter_bsp::OVCamPins;
+
 #[derive(Clone, Copy)]
 pub struct Register {
     pub addr: u8,
@@ -10,6 +22,100 @@ impl Register {
     }
 }
 
+pub struct Ov7670<'d, PIO: PioInstance, I2C: I2cInstance, DMA: Channel, const SM: usize> {
+    dvp: Dvp<'d, PIO, SM>,
+    sccb: Sccb<'d, I2C>,
+    dma: Peri<'d, DMA>,
+    _mclk_pwm: Pwm<'d>,
+}
+
+impl<'d, PIO: PioInstance, I2C: I2cInstance, DMA: Channel, const SM: usize>
+    Ov7670<'d, PIO, I2C, DMA, SM>
+{
+    pub async fn new(
+        i2c: I2c<'d, I2C, Async>,
+        pio: &mut Common<'d, PIO>,
+        sm: StateMachine<'d, PIO, SM>,
+        dma: Peri<'d, DMA>,
+        mclk_slice: Peri<'d, PWM_SLICE4>,
+        pins: OVCamPins,
+    ) -> Self {
+        // 1. Initialize MCLK (PWM)
+        let mut mclk_config = PwmConfig::default();
+        mclk_config.divider = fixed::FixedU16::from_num(1);
+        mclk_config.top = 6;
+        mclk_config.compare_a = 3; // Duty cycle 50%
+        let mclk_pwm = Pwm::new_output_a(mclk_slice, pins.mclk, mclk_config);
+
+        // 2. Initialize SCCB
+        let mut sccb_ctrl = Sccb::new(i2c);
+
+        // Soft Reset
+        sccb_ctrl.write_reg(REG_COM7, COM7_RESET).await.ok();
+        embassy_time::Timer::after(embassy_time::Duration::from_millis(100)).await;
+
+        // Write Init Sequence
+        for reg in ADAFRUIT_OV7670_INIT {
+            sccb_ctrl.write_reg(reg.addr, reg.val).await.ok();
+            embassy_time::Timer::after(embassy_time::Duration::from_micros(1000)).await;
+        }
+
+        for reg in OV7670_RGB565 {
+            sccb_ctrl.write_reg(reg.addr, reg.val).await.ok();
+            embassy_time::Timer::after(embassy_time::Duration::from_micros(1000)).await;
+        }
+
+        for reg in OV7670_DIV16_40X30 {
+            sccb_ctrl.write_reg(reg.addr, reg.val).await.ok();
+            embassy_time::Timer::after(embassy_time::Duration::from_micros(1000)).await;
+        }
+
+        // Wait for AEC/AGC to settle
+        embassy_time::Timer::after(embassy_time::Duration::from_millis(500)).await;
+
+        // Verify PID (0x76)
+        match sccb_ctrl.read_reg(REG_PID).await {
+            Ok(pid) => {
+                defmt::info!("OV7670 PID: 0x{:02x}", pid);
+            }
+            Err(_) => {
+                defmt::error!("OV7670 PID Read Failed!");
+            }
+        }
+
+        // 2. Initialize DVP (PIO)
+        let d0 = pio.make_pio_pin(pins.d0);
+        let d1 = pio.make_pio_pin(pins.d1);
+        let d2 = pio.make_pio_pin(pins.d2);
+        let d3 = pio.make_pio_pin(pins.d3);
+        let d4 = pio.make_pio_pin(pins.d4);
+        let d5 = pio.make_pio_pin(pins.d5);
+        let d6 = pio.make_pio_pin(pins.d6);
+        let d7 = pio.make_pio_pin(pins.d7);
+        let pclk = pio.make_pio_pin(pins.pclk);
+        let href = pio.make_pio_pin(pins.href);
+        let vsync = pio.make_pio_pin(pins.vsync);
+
+        let dvp = Dvp::new(pio, sm, d0, d1, d2, d3, d4, d5, d6, d7, pclk, href, vsync);
+
+        Self {
+            dvp,
+            sccb: sccb_ctrl,
+            dma,
+            _mclk_pwm: mclk_pwm,
+        }
+    }
+
+    pub async fn capture(&mut self, buf: &mut [u32]) {
+        self.dvp.prepare_capture();
+        self.dvp
+            .rx()
+            .dma_pull(self.dma.reborrow(), buf, false)
+            .await;
+    }
+}
+
+#[allow(dead_code, non_upper_case_globals)]
 // Register Addresses
 const REG_GAIN: u8 = 0x00;
 const REG_BLUE: u8 = 0x01;
