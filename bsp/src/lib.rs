@@ -54,8 +54,11 @@ pub struct Board {
     pub neopixel_pio: Peri<'static, peripherals::PIO0>,
     pub neopixel_dma: Peri<'static, peripherals::DMA_CH0>,
 
+    pub cam_dma: Peri<'static, peripherals::DMA_CH1>,
+
     pub hopper_pwm: Peri<'static, peripherals::PWM_SLICE1>,
     pub chutes_pwm: Peri<'static, peripherals::PWM_SLICE5>,
+    pub camera_mclk_pwm: Peri<'static, peripherals::PWM_SLICE4>,
 
     pub i2c0: Peri<'static, peripherals::I2C0>,
     pub i2c_sda: Peri<'static, I2cData>,
@@ -77,8 +80,11 @@ impl Board {
 
             neopixel_pio: p.PIO0,
             neopixel_dma: p.DMA_CH0,
+            cam_dma: p.DMA_CH1,
+
             hopper_pwm: p.PWM_SLICE1,
             chutes_pwm: p.PWM_SLICE5,
+            camera_mclk_pwm: p.PWM_SLICE4,
 
             i2c0: p.I2C0,
             i2c_sda: p.PIN_12,

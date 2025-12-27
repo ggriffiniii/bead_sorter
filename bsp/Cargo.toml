@@ -6,9 +6,9 @@ edition = "2021"
 [dependencies]
 cortex-m = "0.7.7"
 cortex-m-rt = "0.7.3"
-embassy-rp = { git = "https://github.com/embassy-rs/embassy", features = ["defmt", "time-driver", "critical-section-impl", "rp2040"] }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy", features = ["defmt"] }
-embassy-time = { git = "https://github.com/embassy-rs/embassy", features = ["defmt", "defmt-timestamp-uptime"] }
-embassy-usb = { git = "https://github.com/embassy-rs/embassy", features = ["defmt"] }
+embassy-rp = { version = "0.9.0", features = ["defmt", "time-driver", "critical-section-impl", "rp2040"] }
+embassy-sync = { version = "0.7.2", features = ["defmt"] }
+embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-usb = { version = "0.5.1", features = ["defmt"] }
 defmt = "0.3"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
