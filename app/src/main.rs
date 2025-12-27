@@ -11,6 +11,7 @@ use embassy_rp::pio_programs::ws2812::{PioWs2812, PioWs2812Program};
 use embassy_rp::pwm::{Config as PwmConfig, Pwm};
 use embassy_rp::usb;
 // use embassy_rp::Peripheral;
+use embassy_futures::join::join;
 use embassy_time::{with_timeout, Duration, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use smart_leds::RGB8;
@@ -112,11 +113,11 @@ async fn main(_spawner: Spawner) {
 
     // Hopper (PWM Slice 1 A)
     let hopper_pwm = Pwm::new_output_a(board.hopper_pwm, board.hopper_servo, servo_config.clone());
-    let mut hopper = Servo::new(hopper_pwm, Channel::A, HOPPER_MIN, HOPPER_MAX);
+    let mut hopper = Servo::new(hopper_pwm, Channel::A, HOPPER_MIN, HOPPER_MAX, 5250); // 2000us/s speed
 
     // Chutes (PWM Slice 5 A)
     let chutes_pwm = Pwm::new_output_a(board.chutes_pwm, board.chutes_servo, servo_config);
-    let mut chutes = Servo::new(chutes_pwm, Channel::A, CHUTES_MIN, CHUTES_MAX);
+    let mut chutes = Servo::new(chutes_pwm, Channel::A, CHUTES_MIN, CHUTES_MAX, 6000); // 2000us/s speed
 
     // 4. Pause Switch
     let pause_input = Input::new(board.pause_button, Pull::Up);
@@ -138,12 +139,7 @@ async fn main(_spawner: Spawner) {
 
     let demo_fut = async {
         // Wait for USB connection (DTR)
-        while !class.dtr() {
-            led.set_high();
-            Timer::after(Duration::from_millis(100)).await;
-            led.set_low();
-            Timer::after(Duration::from_millis(100)).await;
-        }
+        // USB connection checks removed to allow auto-start.
         led.set_low();
         Timer::after(Duration::from_millis(100)).await;
 
@@ -170,7 +166,9 @@ async fn main(_spawner: Spawner) {
         // Buffer capture logs removed
 
         // Sorting Loop
-        let _ = class.write_packet(b"Starting Sorter Loop...\r\n").await;
+        if class.dtr() {
+            let _ = class.write_packet(b"Starting Sorter Loop...\r\n").await;
+        }
 
         loop {
             if switch.is_active() {
@@ -188,27 +186,17 @@ async fn main(_spawner: Spawner) {
 
             // 1. Pickup Bead (Agitate to capture)
             let pickup_center = HOPPER_PICKUP_POS;
-            hopper
-                .move_to(pickup_center - 100, Duration::from_millis(150))
-                .await;
-            hopper
-                .move_to(pickup_center + 100, Duration::from_millis(150))
-                .await;
-            hopper
-                .move_to(pickup_center - 50, Duration::from_millis(150))
-                .await;
-            hopper
-                .move_to(pickup_center + 50, Duration::from_millis(150))
-                .await;
-            hopper
-                .move_to(pickup_center, Duration::from_millis(150))
-                .await;
+            hopper.move_to(pickup_center - 250).await;
+            hopper.move_to(pickup_center + 250).await;
+            hopper.move_to(pickup_center - 150).await;
+            hopper.move_to(pickup_center + 150).await;
+            hopper.move_to(pickup_center - 75).await;
+            hopper.move_to(pickup_center + 75).await;
+            hopper.move_to(pickup_center).await;
             Timer::after(Duration::from_millis(100)).await;
 
             // 2. Move to Camera
-            hopper
-                .move_to(HOPPER_CAMERA_POS, Duration::from_millis(500))
-                .await;
+            hopper.move_to(HOPPER_CAMERA_POS).await;
             Timer::after(Duration::from_millis(100)).await; // Settle
 
             // 3. Capture & Classify
@@ -218,7 +206,7 @@ async fn main(_spawner: Spawner) {
 
             // Mock Classification
             let timestamp = embassy_time::Instant::now().as_millis();
-            let tube_index = ((timestamp / 2000) % 30) as u8; // Cycle through all 30 tubes
+            let tube_index = (timestamp % 30) as u8; // Cycle through all 30 tubes
             let chute_target = get_chute_pos(tube_index);
 
             // Calculate Hopper Row
@@ -229,17 +217,21 @@ async fn main(_spawner: Spawner) {
             let row_index = ((tube_index / 15) << 1) | ((tube_index % 15) & 1);
             let drop_row = HOPPER_ROW_POSITIONS[row_index as usize];
 
-            // 4. Move Chute (750ms duration)
-            chutes
-                .move_to(chute_target, Duration::from_millis(750))
-                .await;
+            // 4. Move Chute & 5. Align Hopper (Concurrent)
+            // Ensure Chutes are done (750ms) before Drops proceed.
+            // Hopper align takes 500ms + 200ms wait = 700ms.
+            // So join will finish at 750ms (dominated by chutes).
+            let chutes_fut = chutes.move_to(chute_target);
+            let hopper_align_fut = async {
+                hopper.move_to(drop_row).await;
+                Timer::after(Duration::from_millis(200)).await;
+            };
 
-            // 5. Drop Bead (Align with Row then Retract/Drop)
-            hopper.move_to(drop_row, Duration::from_millis(500)).await;
-            Timer::after(Duration::from_millis(200)).await;
-            hopper
-                .move_to(HOPPER_DROP_POS, Duration::from_millis(500))
-                .await;
+            join(chutes_fut, hopper_align_fut).await;
+
+            // 6. Retract/Drop
+            hopper.move_to(HOPPER_DROP_POS).await;
+            Timer::after(Duration::from_millis(300)).await;
         }
     };
 

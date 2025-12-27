@@ -12,16 +12,18 @@ pub struct Servo<'d> {
     min_us: u16,
     max_us: u16,
     current_us: u16,
+    max_speed: u32, // us per second
 }
 
 impl<'d> Servo<'d> {
-    pub fn new(pwm: Pwm<'d>, channel: Channel, min_us: u16, max_us: u16) -> Self {
+    pub fn new(pwm: Pwm<'d>, channel: Channel, min_us: u16, max_us: u16, max_speed: u32) -> Self {
         Self {
             pwm,
             channel,
             min_us,
             max_us,
             current_us: min_us, // Default to min position
+            max_speed,
         }
     }
 
@@ -40,8 +42,21 @@ impl<'d> Servo<'d> {
         let _ = self.pwm.set_duty_cycle_fraction(us, 20000);
     }
 
-    pub async fn move_to(&mut self, target_us: u16, duration: Duration) {
+    pub async fn move_to(&mut self, target_us: u16) {
         let start_us = self.current_us;
+        let diff_abs = (target_us as i32 - start_us as i32).abs() as u32;
+
+        // Calculate duration based on max_speed
+        // time = distance / speed
+        // duration (ms) = (us / (us/sec)) * 1000
+        // Calculate duration based on max_speed
+        // time = distance / speed
+        // duration (ms) = (us / (us/sec)) * 1000
+        // Multiply by 4 because EaseOutQuartic peak velocity is 4x average velocity.
+        let duration_ms = (diff_abs * 1000 * 4) / self.max_speed;
+        // Ensure at least some duration to avoid div by zero or instant jumps
+        let duration = Duration::from_millis(duration_ms.max(1) as u64);
+
         let start_time = Instant::now();
 
         loop {
