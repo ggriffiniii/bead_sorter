@@ -4,13 +4,13 @@
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_rp::bind_interrupts;
-// Imports removed
 use embassy_rp::gpio::{Input, Level, Output, Pull};
 use embassy_rp::peripherals::{PIO0, USB};
 use embassy_rp::pio::Pio;
 use embassy_rp::pio_programs::ws2812::{PioWs2812, PioWs2812Program};
 use embassy_rp::pwm::{Config as PwmConfig, Pwm};
 use embassy_rp::usb;
+// use embassy_rp::Peripheral;
 use embassy_time::{with_timeout, Duration, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use smart_leds::{SmartLedsWrite, RGB8};
@@ -175,8 +175,8 @@ async fn main(_spawner: Spawner) {
         vsync_pin,
     );
 
-    // Acquire Camera DMA (Temporarily Unused for CPU Capture)
-    // let mut cam_dma = board.cam_dma;
+    // Acquire Camera DMA
+    let mut cam_dma = board.cam_dma;
 
     // --- I2C Scan Debug ---
     // Perform a full bus scan to see if *any* device responds.
@@ -307,17 +307,15 @@ async fn main(_spawner: Spawner) {
         // --- DVP Capture Test ---
         // DVP Capture Test
         let _ = class
-            .write_packet(b"Capturing 40x30 Frame (CPU)... \r\n")
+            .write_packet(b"Capturing 40x30 Frame (DMA)... \r\n")
             .await;
 
         let mut buf = [0u32; 600];
 
         dvp.prepare_capture();
 
-        // CPU Capture Loop
-        for i in 0..600 {
-            buf[i] = dvp.rx().wait_pull().await;
-        }
+        // DMA Capture
+        dvp.rx().dma_pull(cam_dma.reborrow(), &mut buf, false).await;
 
         let _ = class.write_packet(b"Frame Captured!\r\n").await;
 
