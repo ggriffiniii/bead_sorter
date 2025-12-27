@@ -13,7 +13,8 @@ use embassy_rp::usb;
 // use embassy_rp::Peripheral;
 use embassy_time::{with_timeout, Duration, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
-use smart_leds::{SmartLedsWrite, RGB8};
+use smart_leds::RGB8;
+// use smart_leds::SmartLedsWrite;
 use {defmt_rtt as _, panic_probe as _};
 
 mod camera;
@@ -28,21 +29,21 @@ use crate::servo::{Channel, Servo};
 use crate::switch::Switch;
 use bead_sorter_bsp::Board;
 
-const HOPPER_MIN: u16 = 567;
+const HOPPER_MIN: u16 = 500;
 const HOPPER_MAX: u16 = 2266;
 
 // Hopper States
-const HOPPER_PICKUP_POS: u16 = 900;
-const HOPPER_CAMERA_POS: u16 = 1580;
-const HOPPER_ROW_POSITIONS: [u16; 4] = [2240, 2107, 1994, 1914];
-const HOPPER_DROP_POS: u16 = 1700;
+const HOPPER_PICKUP_POS: u16 = 760;
+const HOPPER_CAMERA_POS: u16 = 1493;
+const HOPPER_ROW_POSITIONS: [u16; 4] = [2153, 2020, 1887, 1780];
+const HOPPER_DROP_POS: u16 = 1613;
 
 const CHUTES_MIN: u16 = 500;
 const CHUTES_MAX: u16 = 1167;
 const TUBE_COUNT: u8 = 30;
 
 const CHUTE_SLICE_POSITIONS: [u16; 15] = [
-    544, 589, 633, 678, 722, 767, 811, 856, 900, 945, 989, 1034, 1078, 1123, 1167,
+    545, 586, 632, 675, 718, 762, 802, 842, 879, 920, 958, 999, 1041, 1085, 1132,
 ];
 
 fn get_chute_pos(index: u8) -> u16 {
@@ -102,7 +103,7 @@ async fn main(_spawner: Spawner) {
         board.neopixel,
         &program,
     );
-    let mut neopixel: Neopixel<0, 1> = Neopixel::new(ws2812);
+    let _neopixel: Neopixel<0, 1> = Neopixel::new(ws2812);
 
     // 3. Servos (50Hz)
     let mut servo_config = PwmConfig::default();
@@ -146,36 +147,13 @@ async fn main(_spawner: Spawner) {
         led.set_low();
         Timer::after(Duration::from_millis(100)).await;
 
-        let _ = class
-            .write_packet(b"Starting Camera (MCLK=17.9MHz)...\r\n")
-            .await;
+        // Camera Init removed from log
         Timer::after(Duration::from_millis(300)).await;
 
-        let _ = class
-            .write_packet(b"Scanning I2C Bus (0x08-0x77)...\r\n")
-            .await;
-
-        // Scan Loop using `i2c` directly
-        for addr in 0x08u16..0x77u16 {
-            let mut buf = [0u8; 1];
-            // Very short timeout for scanning
-            let res = with_timeout(Duration::from_millis(5), i2c.read_async(addr, &mut buf)).await;
-            if let Ok(Ok(_)) = res {
-                let mut packet = [0u8; 32];
-                let msg = b"Found device at 0x";
-                packet[0..18].copy_from_slice(msg);
-                let hex = b"0123456789abcdef";
-                packet[18] = hex[(addr >> 4) as usize];
-                packet[19] = hex[(addr & 0xF) as usize];
-                packet[20] = b'\r';
-                packet[21] = b'\n';
-                let _ = class.write_packet(&packet[0..22]).await;
-            }
-        }
-        let _ = class.write_packet(b"Scan Complete.\r\n").await;
+        // Scan Logic removed from log
 
         // Initialize Ov7670 Camera
-        let _ = class.write_packet(b"Initializing OV7670...\r\n").await;
+        // Initialize Ov7670 Camera (Verbose log removed)
 
         // Pass board.cam_pins and board.cam_dma to the new struct
         // We use full path or imported path
@@ -189,118 +167,79 @@ async fn main(_spawner: Spawner) {
         )
         .await;
 
-        let _ = class.write_packet(b"Camera Configured.\r\n").await;
+        // Buffer capture logs removed
 
-        // --- DVP Capture Test ---
-        // DVP Capture Test
-        let _ = class
-            .write_packet(b"Capturing 40x30 Frame (DMA)... \r\n")
-            .await;
-
-        let mut buf = [0u32; 600];
-
-        // DMA Capture via Ov7670
-        camera.capture(&mut buf).await;
-
-        let _ = class.write_packet(b"Frame Captured!\r\n").await;
-
-        // Print first few pixels
-        for i in 0..4 {
-            let word = buf[i];
-            // Each word is 2 pixels (2 bytes each).
-            // Format: P1_L P1_H P0_L P0_H ?? Depends on shift.
-            // Shift Left: D0 is LSB.
-            // 32 bits: [Pixel 1] [Pixel 0]
-            // Let's just print hex.
-            let mut hex_buf = [0u8; 10]; // "0xXXXXXXXX"
-            hex_buf[0..10].copy_from_slice(b"0x00000000");
-            // Simple hex print helper or raw bytes
-            // Let's just print "Pixel data captured" for now to save complexity.
-        }
-
-        // Temporary: Flash LED Green to show success
-        neopixel.write(&[RGB8::new(0, 50, 0)]).await;
-        Timer::after(Duration::from_millis(100)).await;
-        neopixel.write(&[RGB8::new(0, 0, 0)]).await;
-
-        Timer::after(Duration::from_millis(100)).await;
-
-        // ...
-
-        let count = buf.len(); // Full buffer filled by DMA
-
-        // ...
-
-        let mut msg: heapless::String<64> = heapless::String::new();
-        use core::fmt::Write;
-        let _ = write!(msg, "Captured {} words (40x30).\r\n", count);
-        let _ = class.write_packet(msg.as_bytes()).await;
-
-        let val0 = buf[0];
-        let val1 = buf[1];
-        msg.clear();
-        let _ = write!(msg, "Data: {:08x} {:08x} ...\r\n", val0, val1);
-        let _ = class.write_packet(msg.as_bytes()).await;
+        // Sorting Loop
+        let _ = class.write_packet(b"Starting Sorter Loop...\r\n").await;
 
         loop {
             if switch.is_active() {
-                // OFF/Paused state logic
-                led.set_high(); // LED ON = Paused (inverse logic?) or just indicator.
+                // Paused
+                led.set_high();
                 if class.dtr() {
                     let _ =
                         with_timeout(Duration::from_millis(5), class.write_packet(b"Paused\r\n"))
                             .await;
                 }
-                Timer::after(Duration::from_millis(1000)).await;
-            } else {
-                led.set_low();
-                if class.dtr() {
-                    let _ =
-                        with_timeout(Duration::from_millis(5), class.write_packet(b"Running\r\n"))
-                            .await;
-                }
-
-                // Sorting Sequence Demo
-
-                // 1. Pickup Bead
-                // let _ = class.write_packet(b"Pickup\r\n").await;
-                hopper
-                    .move_to(HOPPER_PICKUP_POS, Duration::from_millis(500))
-                    .await;
-                Timer::after(Duration::from_millis(200)).await; // Wait for bead pickup
-
-                // 2. Move to Camera
-                // let _ = class.write_packet(b"Inspect\r\n").await;
-                hopper
-                    .move_to(HOPPER_CAMERA_POS, Duration::from_millis(500))
-                    .await;
-                Timer::after(Duration::from_millis(200)).await; // Simulate picture snap time
-
-                // 3. Classify & Select Chute
-                let timestamp = embassy_time::Instant::now().as_millis();
-                let tube_index = ((timestamp / 1000) % 30) as u8; // Cycle through tubes based on time
-
-                // let msg = alloc::format!("Target Chute: {}\r\n", tube_index);
-                // let _ = class.write_packet(msg.as_bytes()).await;
-
-                let chute_target = get_chute_pos(tube_index);
-                chutes
-                    .move_to(chute_target, Duration::from_millis(500))
-                    .await;
-
-                neopixel.write(&[RGB8::new(0, 20, 0)]).await; // Green indicates "Classified"
-
-                // 4. Drop Bead
-                // let _ = class.write_packet(b"Drop\r\n").await;
-                hopper
-                    .move_to(HOPPER_DROP_POS, Duration::from_millis(500))
-                    .await;
-                Timer::after(Duration::from_millis(200)).await; // Wait for drop
-
-                // Reset indicator
-                neopixel.write(&[RGB8::new(0, 0, 0)]).await;
+                Timer::after(Duration::from_millis(500)).await;
+                continue;
             }
+            led.set_low();
+
+            // 1. Pickup Bead (Agitate to capture)
+            let pickup_center = HOPPER_PICKUP_POS;
+            hopper
+                .move_to(pickup_center - 100, Duration::from_millis(150))
+                .await;
+            hopper
+                .move_to(pickup_center + 100, Duration::from_millis(150))
+                .await;
+            hopper
+                .move_to(pickup_center - 50, Duration::from_millis(150))
+                .await;
+            hopper
+                .move_to(pickup_center + 50, Duration::from_millis(150))
+                .await;
+            hopper
+                .move_to(pickup_center, Duration::from_millis(150))
+                .await;
             Timer::after(Duration::from_millis(100)).await;
+
+            // 2. Move to Camera
+            hopper
+                .move_to(HOPPER_CAMERA_POS, Duration::from_millis(500))
+                .await;
+            Timer::after(Duration::from_millis(100)).await; // Settle
+
+            // 3. Capture & Classify
+            // let mut buf = [0u8; 64]; // This buffer needs to be defined outside the loop or passed in
+            // camera.capture(&mut buf).await;
+            // let _ = class.write_packet(b"Captured\r\n").await;
+
+            // Mock Classification
+            let timestamp = embassy_time::Instant::now().as_millis();
+            let tube_index = ((timestamp / 2000) % 30) as u8; // Cycle through all 30 tubes
+            let chute_target = get_chute_pos(tube_index);
+
+            // Calculate Hopper Row
+            // Formula: (tube / 15) * 2 + (tube % 15) & 1 ?
+            // User formula: (tube_idx / 15) << 1 | ((tube_idx % 15) & 1)
+            // (0..14) -> 0 -> row 0 or 1.
+            // (15..29) -> 1 -> row 2 or 3.
+            let row_index = ((tube_index / 15) << 1) | ((tube_index % 15) & 1);
+            let drop_row = HOPPER_ROW_POSITIONS[row_index as usize];
+
+            // 4. Move Chute (750ms duration)
+            chutes
+                .move_to(chute_target, Duration::from_millis(750))
+                .await;
+
+            // 5. Drop Bead (Align with Row then Retract/Drop)
+            hopper.move_to(drop_row, Duration::from_millis(500)).await;
+            Timer::after(Duration::from_millis(200)).await;
+            hopper
+                .move_to(HOPPER_DROP_POS, Duration::from_millis(500))
+                .await;
         }
     };
 

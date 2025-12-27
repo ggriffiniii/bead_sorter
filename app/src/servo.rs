@@ -51,7 +51,7 @@ impl<'d> Servo<'d> {
             }
 
             let progress = elapsed.as_millis() as f32 / duration.as_millis() as f32;
-            let eased_progress = Self::ease_in_out_cubic(progress);
+            let eased_progress = Self::easing_curve(progress);
 
             // Interpolate
             let diff = (target_us as i32) - (start_us as i32);
@@ -66,12 +66,10 @@ impl<'d> Servo<'d> {
         self.set_pulse_width(target_us);
     }
 
-    fn ease_in_out_cubic(x: f32) -> f32 {
-        if x < 0.5 {
-            4.0 * x * x * x
-        } else {
-            let t = -2.0 * x + 2.0;
-            1.0 - (t * t * t) / 2.0
-        }
+    // Ease Out Quartic: 1 - (1 - x)^4
+    // Starts fast, decelerates aggressively and has a long gentle stop.
+    fn easing_curve(x: f32) -> f32 {
+        let t = 1.0 - x;
+        1.0 - (t * t * t * t)
     }
 }
