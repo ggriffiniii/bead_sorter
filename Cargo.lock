@@ -125,7 +125,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "bead_sorter_app"
+name = "bead_sorter_bsp"
+version = "0.1.0"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
+ "defmt 0.3.100",
+ "embassy-rp",
+ "embassy-sync",
+ "embassy-time",
+ "embassy-usb",
+ "panic-probe",
+]
+
+[[package]]
+name = "bead_sorter_fw"
 version = "0.1.0"
 dependencies = [
  "bead_sorter_bsp",
@@ -147,20 +161,6 @@ dependencies = [
  "pio-proc",
  "rp2040-boot2",
  "smart-leds",
-]
-
-[[package]]
-name = "bead_sorter_bsp"
-version = "0.1.0"
-dependencies = [
- "cortex-m",
- "cortex-m-rt",
- "defmt 0.3.100",
- "embassy-rp",
- "embassy-sync",
- "embassy-time",
- "embassy-usb",
- "panic-probe",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 [package]
-name = "bead_sorter_app"
+name = "bead_sorter_fw"
 version = "0.1.0"
 edition = "2021"
 
@@ -27,6 +27,6 @@ pio = { version = "0.3", default-features = false }
 pio-proc = "0.3"
 
 [[bin]]
-name = "bead_sorter_app"
+name = "bead_sorter_fw"
 test = false
 bench = false
