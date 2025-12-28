@@ -83,20 +83,12 @@ impl<'d, PIO: PioInstance, I2C: I2cInstance, DMA: Channel, const SM: usize>
             }
         }
 
-        // 2. Initialize DVP (PIO)
-        let d0 = pio.make_pio_pin(pins.d0);
-        let d1 = pio.make_pio_pin(pins.d1);
-        let d2 = pio.make_pio_pin(pins.d2);
-        let d3 = pio.make_pio_pin(pins.d3);
-        let d4 = pio.make_pio_pin(pins.d4);
-        let d5 = pio.make_pio_pin(pins.d5);
-        let d6 = pio.make_pio_pin(pins.d6);
-        let d7 = pio.make_pio_pin(pins.d7);
-        let pclk = pio.make_pio_pin(pins.pclk);
-        let href = pio.make_pio_pin(pins.href);
-        let vsync = pio.make_pio_pin(pins.vsync);
-
-        let dvp = Dvp::new(pio, sm, d0, d1, d2, d3, d4, d5, d6, d7, pclk, href, vsync);
+        // 3. Initialize DVP (PIO)
+        // Pass pins individually; Dvp::new handles conversion to PioPin
+        let dvp = Dvp::new(
+            pio, sm, pins.d0, pins.d1, pins.d2, pins.d3, pins.d4, pins.d5, pins.d6, pins.d7,
+            pins.pclk, pins.href, pins.vsync,
+        );
 
         Self {
             dvp,

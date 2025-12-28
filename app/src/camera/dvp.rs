@@ -1,7 +1,6 @@
 use embassy_rp::pio::{
     Common, Config, Direction, LoadedProgram, Pin, ShiftDirection, StateMachine, StateMachineRx,
 };
-use pio::{pio_asm, InstructionOperands, JmpCondition};
 
 pub struct Dvp<'d, T: embassy_rp::pio::Instance, const S: usize> {
     sm: StateMachine<'d, T, S>,
@@ -19,39 +18,83 @@ pub struct Dvp<'d, T: embassy_rp::pio::Instance, const S: usize> {
     program: LoadedProgram<'d, T>,
 }
 
+use embassy_rp::pio::PioPin;
+use embassy_rp::Peri;
+
 impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         pio: &mut Common<'d, T>,
         mut sm: StateMachine<'d, T, S>,
-        d0_pin: Pin<'d, T>,
-        _d1_pin: Pin<'d, T>,
-        _d2_pin: Pin<'d, T>,
-        _d3_pin: Pin<'d, T>,
-        _d4_pin: Pin<'d, T>,
-        _d5_pin: Pin<'d, T>,
-        _d6_pin: Pin<'d, T>,
-        _d7_pin: Pin<'d, T>,
-        _pclk_pin: Pin<'d, T>,
-        href_pin: Pin<'d, T>,
-        _vsync_pin: Pin<'d, T>,
+        d0: Peri<'d, impl PioPin + 'd>,
+        d1: Peri<'d, impl PioPin + 'd>,
+        d2: Peri<'d, impl PioPin + 'd>,
+        d3: Peri<'d, impl PioPin + 'd>,
+        d4: Peri<'d, impl PioPin + 'd>,
+        d5: Peri<'d, impl PioPin + 'd>,
+        d6: Peri<'d, impl PioPin + 'd>,
+        d7: Peri<'d, impl PioPin + 'd>,
+        pclk: Peri<'d, impl PioPin + 'd>,
+        href: Peri<'d, impl PioPin + 'd>,
+        vsync: Peri<'d, impl PioPin + 'd>,
     ) -> Self {
-        // Pins must be sequential for IN: D0..D7.
-        // DVP Capture Program
-        // 1. Wait for HREF (GPIO 10) high (Start of Line)
-        // 2. Loop PCLK (GPIO 9) cycles to capture data
-        // 3. Exit loop when HREF goes low
-        let prg = pio_asm!(
-            "wait 0 gpio 11",
-            "wait 1 gpio 11",
-            ".wrap_target",
-            "wait 1 gpio 10", // Wait for HREF High
-            "wait 1 gpio 9",  // Wait PCLK High
-            "in pins, 8",     // Capture D0-D7
-            "wait 0 gpio 9",  // Wait PCLK Low
-            ".wrap"
-        );
+        // Convert peripherals to PIO Pins
+        let d0_pin = pio.make_pio_pin(d0);
+        let d1_pin = pio.make_pio_pin(d1);
+        let d2_pin = pio.make_pio_pin(d2);
+        let d3_pin = pio.make_pio_pin(d3);
+        let d4_pin = pio.make_pio_pin(d4);
+        let d5_pin = pio.make_pio_pin(d5);
+        let d6_pin = pio.make_pio_pin(d6);
+        let d7_pin = pio.make_pio_pin(d7);
+        let pclk_pin = pio.make_pio_pin(pclk);
+        let href_pin = pio.make_pio_pin(href);
+        let vsync_pin = pio.make_pio_pin(vsync);
 
-        let program = pio.load_program(&prg.program);
+        // DVP Capture Program
+        // 1. Wait for VSYNC (Start of Frame) - Rising Edge
+        // 2. Wait for HREF (Start of Line) - High
+        // 3. Loop PCLK cycles to capture data
+        // 4. Exit loop when HREF goes low (handled by wrap logic implicitly? No, wait 1 gpio 10 handles start, where is end?)
+
+        // Original ASM:
+        // wait 0 gpio 11
+        // wait 1 gpio 11
+        // .wrap_target
+        // wait 1 gpio 10
+        // wait 1 gpio 9
+        // in pins, 8
+        // wait 0 gpio 9
+        // .wrap
+
+        let mut a = pio::Assembler::<32>::new();
+        let mut wrap_target = a.label();
+        let mut wrap_source = a.label();
+
+        // 1. Wait for VSYNC Rising Edge
+        a.wait(0, pio::WaitSource::GPIO, vsync_pin.pin(), false); // False = Absolute
+        a.wait(1, pio::WaitSource::GPIO, vsync_pin.pin(), false);
+
+        // .wrap_target
+        a.bind(&mut wrap_target);
+
+        // 2. Wait for HREF High
+        a.wait(1, pio::WaitSource::GPIO, href_pin.pin(), false);
+
+        // 3. Wait PCLK High
+        a.wait(1, pio::WaitSource::GPIO, pclk_pin.pin(), false);
+
+        // 4. Capture D0-D7
+        a.r#in(pio::InSource::PINS, 8);
+
+        // 5. Wait PCLK Low
+        a.wait(0, pio::WaitSource::GPIO, pclk_pin.pin(), false);
+
+        // .wrap
+        a.bind(&mut wrap_source);
+        let prg = a.assemble_with_wrap(wrap_source, wrap_target);
+
+        let program = pio.load_program(&prg);
 
         // Configure State Machine Here
         let mut config = Config::default();
@@ -60,12 +103,12 @@ impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
         sm.set_pin_dirs(
             Direction::In,
             &[
-                &d0_pin, &_d1_pin, &_d2_pin, &_d3_pin, &_d4_pin, &_d5_pin, &_d6_pin, &_d7_pin,
+                &d0_pin, &d1_pin, &d2_pin, &d3_pin, &d4_pin, &d5_pin, &d6_pin, &d7_pin,
             ],
         );
 
         config.set_in_pins(&[
-            &d0_pin, &_d1_pin, &_d2_pin, &_d3_pin, &_d4_pin, &_d5_pin, &_d6_pin, &_d7_pin,
+            &d0_pin, &d1_pin, &d2_pin, &d3_pin, &d4_pin, &d5_pin, &d6_pin, &d7_pin,
         ]);
 
         config.shift_in.direction = ShiftDirection::Right; // bit 0 = D0.
@@ -78,16 +121,16 @@ impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
         Self {
             sm,
             d0: d0_pin,
-            d1: _d1_pin,
-            d2: _d2_pin,
-            d3: _d3_pin,
-            d4: _d4_pin,
-            d5: _d5_pin,
-            d6: _d6_pin,
-            d7: _d7_pin,
-            pclk: _pclk_pin,
+            d1: d1_pin,
+            d2: d2_pin,
+            d3: d3_pin,
+            d4: d4_pin,
+            d5: d5_pin,
+            d6: d6_pin,
+            d7: d7_pin,
+            pclk: pclk_pin,
             href: href_pin,
-            vsync: _vsync_pin,
+            vsync: vsync_pin,
             program,
         }
     }
@@ -108,15 +151,8 @@ impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
         self.sm.clkdiv_restart();
 
         // 3. Force Jump to Program Start (Reset PC)
-        // Ensure we jump to the absolute address where the program is loaded.
-        let origin = self.program.origin;
-        let instr = InstructionOperands::JMP {
-            condition: JmpCondition::Always,
-            address: origin,
-        }
-        .encode();
         unsafe {
-            self.sm.exec_instr(instr);
+            self.sm.exec_jmp(self.program.origin);
         }
 
         // 4. Re-enable SM to start waiting for VSYNC/HREF from the top
