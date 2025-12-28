@@ -212,72 +212,10 @@ async fn main(_spawner: Spawner) {
 
             // 2. Move to Camera
             hopper.move_to(HOPPER_CAMERA_POS).await;
-            Timer::after(Duration::from_millis(2000)).await; // Settle for stable image
+            Timer::after(Duration::from_millis(200)).await; // Settle for stable image
 
             let mut buf = [0u32; 600];
             let _ = camera.capture(&mut buf).await;
-
-            /*
-            // Debug: Check for data content
-            // Log first 100 pixels to inspect colors
-            let buf_bytes_debug =
-                unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4) };
-
-            let _ = class.write_packet(b"\r\n--- Frame Start ---\r\n").await;
-
-            let mut debug_str: String<256> = String::new();
-
-            for i in 0..100 {
-                let idx = i * 2;
-                let p_hi = buf_bytes_debug[idx];
-                let p_lo = buf_bytes_debug[idx + 1];
-                let p = ((p_hi as u16) << 8) | (p_lo as u16);
-
-                let r = (p >> 11) & 0x1F;
-                let g = (p >> 5) & 0x3F;
-                let b = p & 0x1F;
-
-                // Scale to 8-bit
-                let r8 = (r * 255) / 31;
-                let g8 = (g * 255) / 63;
-                let b8 = (b * 255) / 31;
-
-                // Format: rgb(r,g,b),
-                debug_str.clear();
-                let _ = write!(debug_str, "rgb({},{},{}), ", r8, g8, b8);
-                let _ = class.write_packet(debug_str.as_bytes()).await;
-
-                // Newline every 10 pixels
-                if (i + 1) % 10 == 0 {
-                    let _ = class.write_packet(b"\r\n").await;
-                }
-            }
-            let mut non_zeros = 0;
-            for val in buf.iter() {
-                if *val != 0 {
-                    non_zeros += 1;
-                }
-            }
-
-            debug_str.clear();
-            if non_zeros == 0 {
-                let _ = class.write_packet(b"ERROR: ALL ZEROS\r\n").await;
-            } else {
-                let _ = write!(debug_str, "Valid: {}/600\r\n", non_zeros);
-                let _ = class.write_packet(debug_str.as_bytes()).await;
-            }
-            */
-
-            // Debug check for All Zeros - Keep this as a single packet safety check
-            let mut non_zeros = 0;
-            for val in buf.iter() {
-                if *val != 0 {
-                    non_zeros += 1;
-                }
-            }
-            if non_zeros == 0 {
-                let _ = class.write_packet(b"ERROR: ALL ZEROS\r\n").await;
-            }
 
             // RESTORE BINARY STREAM
             // Send Image Header: [0xBE, 0xAD, 0x1F, 0x01]
