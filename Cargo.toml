@@ -1,3 +1,3 @@
 [workspace]
-members = ["bsp", "app"]
+members = ["bsp", "app", "tools/image_saver"]
 resolver = "2"

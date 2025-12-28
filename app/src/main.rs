@@ -4,7 +4,7 @@
 use defmt_rtt as _;
 use embassy_executor::Spawner;
 use embassy_rp::bind_interrupts;
-use embassy_rp::gpio::{Input, Level, Output, Pull};
+use embassy_rp::gpio::{Input, Pull};
 use embassy_rp::peripherals::{PIO0, USB};
 use embassy_rp::pio::Pio;
 use embassy_rp::pio_programs::ws2812::{PioWs2812, PioWs2812Program};
@@ -16,6 +16,8 @@ use embassy_time::{with_timeout, Duration, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
 use smart_leds::RGB8;
 // use smart_leds::SmartLedsWrite;
+use core::fmt::Write;
+use heapless::String;
 use {defmt_rtt as _, panic_probe as _};
 
 mod camera;
@@ -123,8 +125,12 @@ async fn main(_spawner: Spawner) {
     let pause_input = Input::new(board.pause_button, Pull::Up);
     let mut switch = Switch::new(pause_input);
 
-    // 5. Camera LED
-    let mut led = Output::new(board.camera_led, Level::Low);
+    // 5. Camera LED (PWM Slice 3 B, Pin 23)
+    let mut led_config = PwmConfig::default();
+    led_config.divider = fixed::FixedU16::from_num(125); // 1MHz (1us tick)
+    led_config.top = 1000; // 1kHz (1ms period)
+    led_config.compare_b = 500; // 50% Duty Cycle
+    let mut led = Pwm::new_output_b(board.camera_led_pwm, board.camera_led, led_config.clone());
 
     // 7. I2C0 For ov7670 configuration
     let mut i2c_config = embassy_rp::i2c::Config::default();
@@ -140,7 +146,9 @@ async fn main(_spawner: Spawner) {
     let demo_fut = async {
         // Wait for USB connection (DTR)
         // USB connection checks removed to allow auto-start.
-        led.set_low();
+        // led.set_low(); // GPIO method removed
+        // Ensure LED is ON (50%)
+        led.set_config(&led_config);
         Timer::after(Duration::from_millis(100)).await;
 
         // Camera Init removed from log
@@ -163,6 +171,9 @@ async fn main(_spawner: Spawner) {
         )
         .await;
 
+        // Enable Color Bar Test Pattern for debugging
+        // camera.enable_test_pattern().await;
+
         // Buffer capture logs removed
 
         // Sorting Loop
@@ -173,7 +184,9 @@ async fn main(_spawner: Spawner) {
         loop {
             if switch.is_active() {
                 // Paused
-                led.set_high();
+                // Turn OFF LED when paused
+                led_config.compare_b = 0;
+                led.set_config(&led_config);
                 if class.dtr() {
                     let _ =
                         with_timeout(Duration::from_millis(5), class.write_packet(b"Paused\r\n"))
@@ -182,7 +195,9 @@ async fn main(_spawner: Spawner) {
                 Timer::after(Duration::from_millis(500)).await;
                 continue;
             }
-            led.set_low();
+            // Turn ON LED (50%) when running
+            led_config.compare_b = 500;
+            led.set_config(&led_config);
 
             // 1. Pickup Bead (Agitate to capture)
             let pickup_center = HOPPER_PICKUP_POS;
@@ -197,16 +212,97 @@ async fn main(_spawner: Spawner) {
 
             // 2. Move to Camera
             hopper.move_to(HOPPER_CAMERA_POS).await;
-            Timer::after(Duration::from_millis(100)).await; // Settle
+            Timer::after(Duration::from_millis(2000)).await; // Settle for stable image
 
-            // 3. Capture & Classify
-            // let mut buf = [0u8; 64]; // This buffer needs to be defined outside the loop or passed in
-            // camera.capture(&mut buf).await;
-            // let _ = class.write_packet(b"Captured\r\n").await;
+            let mut buf = [0u32; 600];
+            let _ = camera.capture(&mut buf).await;
+
+            /*
+            // Debug: Check for data content
+            // Log first 100 pixels to inspect colors
+            let buf_bytes_debug =
+                unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4) };
+
+            let _ = class.write_packet(b"\r\n--- Frame Start ---\r\n").await;
+
+            let mut debug_str: String<256> = String::new();
+
+            for i in 0..100 {
+                let idx = i * 2;
+                let p_hi = buf_bytes_debug[idx];
+                let p_lo = buf_bytes_debug[idx + 1];
+                let p = ((p_hi as u16) << 8) | (p_lo as u16);
+
+                let r = (p >> 11) & 0x1F;
+                let g = (p >> 5) & 0x3F;
+                let b = p & 0x1F;
+
+                // Scale to 8-bit
+                let r8 = (r * 255) / 31;
+                let g8 = (g * 255) / 63;
+                let b8 = (b * 255) / 31;
+
+                // Format: rgb(r,g,b),
+                debug_str.clear();
+                let _ = write!(debug_str, "rgb({},{},{}), ", r8, g8, b8);
+                let _ = class.write_packet(debug_str.as_bytes()).await;
+
+                // Newline every 10 pixels
+                if (i + 1) % 10 == 0 {
+                    let _ = class.write_packet(b"\r\n").await;
+                }
+            }
+            let mut non_zeros = 0;
+            for val in buf.iter() {
+                if *val != 0 {
+                    non_zeros += 1;
+                }
+            }
+
+            debug_str.clear();
+            if non_zeros == 0 {
+                let _ = class.write_packet(b"ERROR: ALL ZEROS\r\n").await;
+            } else {
+                let _ = write!(debug_str, "Valid: {}/600\r\n", non_zeros);
+                let _ = class.write_packet(debug_str.as_bytes()).await;
+            }
+            */
+
+            // Debug check for All Zeros - Keep this as a single packet safety check
+            let mut non_zeros = 0;
+            for val in buf.iter() {
+                if *val != 0 {
+                    non_zeros += 1;
+                }
+            }
+            if non_zeros == 0 {
+                let _ = class.write_packet(b"ERROR: ALL ZEROS\r\n").await;
+            }
+
+            // RESTORE BINARY STREAM
+            // Send Image Header: [0xBE, 0xAD, 0x1F, 0x01]
+            let header = [0xBE, 0xAD, 0x1F, 0x01];
+            let _ = class.write_packet(&header).await;
+
+            // Send Image Data
+            // Safety: Transmuting valid u32 slice to u8 slice for transmission.
+            let buf_bytes =
+                unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4) };
+
+            // Write in chunks to avoid overwhelming USB buffer if necessary,
+            // though embassy-usb handles segmentation usually.
+            // Max packet is 64, but write_packet handles multi-packet transfers?
+            // "write_packet" implies a single packet. Let's chop it to be safe.
+            for chunk in buf_bytes.chunks(64) {
+                let _ = class.write_packet(chunk).await;
+            }
+
+            let _ = class.write_packet(b"Captured\r\n").await;
 
             // Mock Classification
             let timestamp = embassy_time::Instant::now().as_millis();
             let tube_index = (timestamp % 30) as u8; // Cycle through all 30 tubes
+            let tube_index = 0;
             let chute_target = get_chute_pos(tube_index);
 
             // Calculate Hopper Row

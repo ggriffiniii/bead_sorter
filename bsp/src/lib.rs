@@ -59,6 +59,7 @@ pub struct Board {
     pub hopper_pwm: Peri<'static, peripherals::PWM_SLICE1>,
     pub chutes_pwm: Peri<'static, peripherals::PWM_SLICE5>,
     pub camera_mclk_pwm: Peri<'static, peripherals::PWM_SLICE4>,
+    pub camera_led_pwm: Peri<'static, peripherals::PWM_SLICE3>,
 
     pub i2c0: Peri<'static, peripherals::I2C0>,
     pub i2c_sda: Peri<'static, I2cData>,
@@ -85,6 +86,7 @@ impl Board {
             hopper_pwm: p.PWM_SLICE1,
             chutes_pwm: p.PWM_SLICE5,
             camera_mclk_pwm: p.PWM_SLICE4,
+            camera_led_pwm: p.PWM_SLICE3,
 
             i2c0: p.I2C0,
             i2c_sda: p.PIN_12,

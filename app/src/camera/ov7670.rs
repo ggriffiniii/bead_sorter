@@ -43,7 +43,7 @@ impl<'d, PIO: PioInstance, I2C: I2cInstance, DMA: Channel, const SM: usize>
         // 1. Initialize MCLK (PWM)
         let mut mclk_config = PwmConfig::default();
         mclk_config.divider = fixed::FixedU16::from_num(1);
-        mclk_config.top = 6;
+        mclk_config.top = 6; // ~17.8 MHz
         mclk_config.compare_a = 3; // Duty cycle 50%
         let mclk_pwm = Pwm::new_output_a(mclk_slice, pins.mclk, mclk_config);
 
@@ -106,12 +106,23 @@ impl<'d, PIO: PioInstance, I2C: I2cInstance, DMA: Channel, const SM: usize>
         }
     }
 
-    pub async fn capture(&mut self, buf: &mut [u32]) {
+    pub async fn capture(&mut self, buf: &mut [u32]) -> Result<(), ()> {
+        // 1. Prepare DVP (PIO)
         self.dvp.prepare_capture();
         self.dvp
             .rx()
             .dma_pull(self.dma.reborrow(), buf, false)
             .await;
+        self.dvp.stop();
+        Ok(())
+    }
+
+    pub async fn enable_test_pattern(&mut self) {
+        // Enable Color Bar Test Pattern (Bit 7 of SCALING_XSC and SCALING_YSC)
+        // Assuming DIV16 40x30 config (0x40 base).
+        let val = 0x40 | 0x80;
+        let _ = self.sccb.write_reg(REG_SCALING_YSC, val).await;
+        let _ = self.sccb.write_reg(REG_SCALING_XSC, val).await;
     }
 }
 
@@ -269,7 +280,7 @@ pub const ADAFRUIT_OV7670_INIT: &[Register] = &[
     Register::new(REG_GAM_BASE + 14, 0xE8),
     Register::new(REG_COM8, 0xC0 | 0x20), // FASTAEC, AECSTEP, BANDING
     Register::new(REG_GAIN, 0x00),
-    Register::new(REG_COM2, 0x00), // Output Drive Capability 1x, NO S-Sleep
+    Register::new(REG_COM2, 0x00), // Output Drive Capability 1x
     Register::new(REG_COM4, 0x00),
     Register::new(REG_COM9, 0x20), // Max AGC
     Register::new(REG_BD50MAX, 0x05),
@@ -285,7 +296,7 @@ pub const ADAFRUIT_OV7670_INIT: &[Register] = &[
     Register::new(REG_HAECC5, 0xF0),
     Register::new(REG_HAECC6, 0x90),
     Register::new(REG_HAECC7, 0x94),
-    Register::new(REG_COM8, 0xC0 | 0x20 | 0x04 | 0x01), // + AGC, AEC
+    Register::new(REG_COM8, 0xC0 | 0x20 | 0x04 | 0x01), // + AGC, AEC (No AWB)
     Register::new(REG_COM5, 0x61),
     Register::new(REG_COM6, 0x4B),
     Register::new(0x16, 0x02),
@@ -346,6 +357,7 @@ pub const ADAFRUIT_OV7670_INIT: &[Register] = &[
     Register::new(REG_BRIGHT, 0x00),
     Register::new(REG_CONTRAS, 0x40),
     Register::new(REG_CONTRAS_CENTER, 0x80),
+    Register::new(REG_MVFP, 0x37), // flip X and Y
 ];
 
 // 40x30 Configuration (DIV16) derived from _frame_control in CircuitPython
@@ -356,9 +368,9 @@ pub const OV7670_DIV16_40X30: &[Register] = &[
     Register::new(REG_COM3, COM3_DCWEN | COM3_SCALEEN),
     // COM14: 0x18 + 4 = 0x1C (Enable PCLK Divider)
     Register::new(REG_COM14, 0x1C),
-    // SCALING_DCWCTR: 4 * 0x11 = 0x44
-    Register::new(REG_SCALING_DCWCTR, 0x44),
-    // SCALING_PCLK_DIV: 0xF0 + 4 = 0xF4
+    // SCALING_DCWCTR: 3 * 0x11 = 0x33
+    Register::new(REG_SCALING_DCWCTR, 0x33),
+    // SCALING_PCLK_DIV: 0xF0 + 4 = 0xF4 (Enable PCLK Divider /16)
     Register::new(REG_SCALING_PCLK_DIV, 0xF4),
     // SCALING_XSC / YSC
     // CircuitPython Reads current and applies 0x40 (0.5 zoom) for DIV16

@@ -1,10 +1,22 @@
 use embassy_rp::pio::{
-    Common, Config, Direction, Pin, ShiftDirection, StateMachine, StateMachineRx,
+    Common, Config, Direction, LoadedProgram, Pin, ShiftDirection, StateMachine, StateMachineRx,
 };
-use pio::pio_asm;
+use pio::{pio_asm, InstructionOperands, JmpCondition};
 
 pub struct Dvp<'d, T: embassy_rp::pio::Instance, const S: usize> {
     sm: StateMachine<'d, T, S>,
+    d0: Pin<'d, T>,
+    d1: Pin<'d, T>,
+    d2: Pin<'d, T>,
+    d3: Pin<'d, T>,
+    d4: Pin<'d, T>,
+    d5: Pin<'d, T>,
+    d6: Pin<'d, T>,
+    d7: Pin<'d, T>,
+    pclk: Pin<'d, T>,
+    href: Pin<'d, T>,
+    vsync: Pin<'d, T>,
+    program: LoadedProgram<'d, T>,
 }
 
 impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
@@ -24,50 +36,26 @@ impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
         _vsync_pin: Pin<'d, T>,
     ) -> Self {
         // Pins must be sequential for IN: D0..D7.
-        // JMP pin: HREF.
-        // Side set? No.
-        // We need to use input_pins for "wait gpio".
-        // Wait GPIO uses absolute numbering!
-        // We can use "wait 1 pin 0" if we set input_pins correctly, but it's tricky with multiple pins.
-        // Best approach for PIO "wait":
-        // Map VSYNC, HREF, PCLK to `in` pins if possible, or use JMP PIN for one.
-        // The previous code hardcoded GPIO 9, 10, 11 (PCLK, HREF, VSYNC).
-        // Let's verify actual pins: PCLK=14, VSYNC=16, HREF=15.
-        // The hardcoded values 9,10,11 are WRONG for Bead Sorter hardware.
-        // This explains the hang.
-        //
-        // Also: VSYNC Config in ov7670.rs is "VS_NEG" (Negative VSYNC). Active Low?
-        // Usually VSYNC is a short pulse. Start of frame is indicated by VSYNC edge.
-        // If VS_NEG=1, VSYNC pulse is Negative (High->Low->High).
-        // Start of frame is Falling Edge?
-        // Let's assume standard VSYNC pulse logic.
-        //
-        // Correct PIO for flexible pins:
-        // We can't easily wait on arbitrary pins without mapping them.
-        // But we have limited "Input Source" mappings.
-        //
-        // To fix quickly: Hardcode correct GPIO numbers for Bead Sorter.
-        // PCLK = 14
-        // HREF = 15
-        // VSYNC = 16
-
         // DVP Capture Program
         // 1. Wait for HREF (GPIO 10) high (Start of Line)
         // 2. Loop PCLK (GPIO 9) cycles to capture data
         // 3. Exit loop when HREF goes low
         let prg = pio_asm!(
+            "wait 0 gpio 11",
+            "wait 1 gpio 11",
             ".wrap_target",
             "wait 1 gpio 10", // Wait for HREF High
-            "line_loop:",
-            "  wait 1 gpio 9",      // Wait PCLK High
-            "  in pins, 8",         // Capture D0-D7
-            "  wait 0 gpio 9",      // Wait PCLK Low
-            "  jmp pin, line_loop", // Continue if HREF is still High
+            "wait 1 gpio 9",  // Wait PCLK High
+            "in pins, 8",     // Capture D0-D7
+            "wait 0 gpio 9",  // Wait PCLK Low
             ".wrap"
         );
 
+        let program = pio.load_program(&prg.program);
+
+        // Configure State Machine Here
         let mut config = Config::default();
-        config.use_program(&pio.load_program(&prg.program), &[]);
+        config.use_program(&program, &[]);
 
         sm.set_pin_dirs(
             Direction::In,
@@ -76,22 +64,32 @@ impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
             ],
         );
 
-        // Map `in` pin base to D0 (GPIO 0)
         config.set_in_pins(&[
             &d0_pin, &_d1_pin, &_d2_pin, &_d3_pin, &_d4_pin, &_d5_pin, &_d6_pin, &_d7_pin,
         ]);
 
-        // JMP pin is HREF (GPIO 10)
-        config.set_jmp_pin(&href_pin);
-
-        config.shift_in.direction = ShiftDirection::Left; // bit 0 = D0
+        config.shift_in.direction = ShiftDirection::Right; // bit 0 = D0.
         config.shift_in.auto_fill = true; // Auto Push
         config.shift_in.threshold = 32; // 4 bytes per word
 
         sm.set_config(&config);
-        sm.set_enable(true);
+        sm.set_enable(false); // Start disabled
 
-        Self { sm }
+        Self {
+            sm,
+            d0: d0_pin,
+            d1: _d1_pin,
+            d2: _d2_pin,
+            d3: _d3_pin,
+            d4: _d4_pin,
+            d5: _d5_pin,
+            d6: _d6_pin,
+            d7: _d7_pin,
+            pclk: _pclk_pin,
+            href: href_pin,
+            vsync: _vsync_pin,
+            program,
+        }
     }
 
     pub fn rx(&mut self) -> &mut StateMachineRx<'d, T, S> {
@@ -99,8 +97,33 @@ impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
     }
 
     pub fn prepare_capture(&mut self) {
-        // Drain FIFO
-        while self.sm.rx().try_pull().is_some() {}
+        // 1. Assert SM is disabled (enforcing stop() was called)
+        if self.sm.is_enabled() {
+            panic!("PIO State Machine is already enabled! Did you forget to call stop()?");
+        }
+
+        // 2. Clear FIFO and internal state
+        self.sm.clear_fifos();
+        self.sm.restart(); // Resets internal state but NOT PC
+        self.sm.clkdiv_restart();
+
+        // 3. Force Jump to Program Start (Reset PC)
+        // Ensure we jump to the absolute address where the program is loaded.
+        let origin = self.program.origin;
+        let instr = InstructionOperands::JMP {
+            condition: JmpCondition::Always,
+            address: origin,
+        }
+        .encode();
+        unsafe {
+            self.sm.exec_instr(instr);
+        }
+
+        // 4. Re-enable SM to start waiting for VSYNC/HREF from the top
         self.sm.set_enable(true);
+    }
+
+    pub fn stop(&mut self) {
+        self.sm.set_enable(false);
     }
 }
