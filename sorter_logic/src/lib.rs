@@ -74,29 +74,36 @@ impl<const N: usize> Palette<N> {
 
     /// Match a bead color & variance against the palette.
     /// Recommended Threshold: 100.
-    pub fn match_color(&mut self, rgb: &Rgb, variance: u32, threshold: u32) -> PaletteMatch {
+    /// Match a bead color & variance against the palette.
+    /// Recommended Threshold: 30 (CIELAB DeltaE).
+    pub fn match_color(&mut self, rgb: &Rgb, _variance: u32, threshold: u32) -> PaletteMatch {
+        let mut best_idx = None;
+        let mut min_dist = u32::MAX;
+
         for (i, entry) in self.colors.iter().enumerate() {
             if let Some(entry) = entry {
-                let (center_rgb, center_var) = entry.avg();
+                let (center_rgb, _) = entry.avg();
                 let dist_lab = rgb.dist_lab(&center_rgb);
 
-                // Variance Diff Weight: 0.10 (1/10) - Tuned for 8-palette split
-                let var_diff = (variance as i64 - center_var as i64).abs();
-                let dist_var = (var_diff / 10) as u32;
-
-                let total_dist = dist_lab + dist_var;
-
-                if total_dist < threshold {
-                    return PaletteMatch::Match(i);
+                // Pure Color Matching (No Variance Penalty)
+                if dist_lab < min_dist {
+                    min_dist = dist_lab;
+                    best_idx = Some(i);
                 }
             } else {
                 break;
             }
         }
 
+        if let Some(idx) = best_idx {
+            if min_dist < threshold {
+                return PaletteMatch::Match(idx);
+            }
+        }
+
         if self.count < N {
             let idx = self.count;
-            self.colors[idx] = Some(PaletteEntry::new(*rgb, variance));
+            self.colors[idx] = Some(PaletteEntry::new(*rgb, _variance));
             self.count += 1;
             PaletteMatch::NewEntry(idx)
         } else {
@@ -220,6 +227,7 @@ pub struct AnalysisConfig {
     pub min_dimension: usize,
     pub aspect_ratio_min: f32,
     pub aspect_ratio_max: f32,
+    pub filter_percent: u8,
 }
 
 impl Default for AnalysisConfig {
@@ -229,6 +237,7 @@ impl Default for AnalysisConfig {
             min_dimension: 10,
             aspect_ratio_min: 0.6,
             aspect_ratio_max: 1.6,
+            filter_percent: 60,
         }
     }
 }
@@ -249,7 +258,7 @@ pub fn analyze_image_debug(
     width: usize,
     height: usize,
     mut mask: Option<&mut [u8]>,
-    _config: AnalysisConfig,
+    config: AnalysisConfig,
 ) -> Option<BeadAnalysis> {
     if width == 0 || height == 0 || data.len() < width * height * 2 {
         return None;
@@ -400,6 +409,7 @@ pub fn analyze_image_debug(
                 best_score = score;
                 best_cx = cx;
                 best_cy = cy;
+                // Temporary stats, will be refined below
                 best_stats = Some((avg, count, total_variance));
             }
         }
@@ -410,40 +420,145 @@ pub fn analyze_image_debug(
         return None;
     }
 
-    if let Some((avg, count, variance)) = best_stats {
-        // Draw Mask for Debug
-        if let Some(m) = mask {
-            let cy = best_cy;
-            let cx = best_cx;
-            let min_y = (cy - r_outer).max(0);
-            let max_y = (cy + r_outer).min(height as i32 - 1);
-            let min_x = (cx - r_outer).max(0);
-            let max_x = (cx + r_outer).min(width as i32 - 1);
+    // Refine Stats with Outlier Filtering (Top 40% Variance Removal)
+    if let Some((_, _, _)) = best_stats {
+        let cx = best_cx;
+        let cy = best_cy;
 
-            for y in min_y..=max_y {
-                for x in min_x..=max_x {
-                    let dy = y - cy;
-                    let dx = x - cx;
-                    let dist_sq = dx * dx + dy * dy;
-                    if dist_sq >= r_inner_sq && dist_sq <= r_outer_sq {
-                        let m_idx = y as usize * width + x as usize;
-                        if m_idx < m.len() {
-                            m[m_idx] = 1;
-                        }
+        // (rgb565, dist_sq_from_mean, mask_index)
+        let mut pixels: [(u16, u32, usize); 256] = [(0, 0, 0); 256];
+        let mut p_count = 0;
+
+        // 1. Collect Pixels & Calculate Initial Mean
+        let mut sum_r = 0u32;
+        let mut sum_g = 0u32;
+        let mut sum_b = 0u32;
+
+        let min_y = (cy - r_outer).max(0);
+        let max_y = (cy + r_outer).min(height as i32 - 1);
+        let min_x = (cx - r_outer).max(0);
+        let max_x = (cx + r_outer).min(width as i32 - 1);
+
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                let dy = y - cy;
+                let dx = x - cx;
+                let dist_sq = dx * dx + dy * dy;
+
+                if dist_sq >= r_inner_sq && dist_sq <= r_outer_sq {
+                    let idx = (y as usize * width + x as usize) * 2;
+                    if idx + 1 >= data.len() {
+                        continue;
+                    }
+
+                    if p_count < 256 {
+                        let p = u16::from_be_bytes([data[idx], data[idx + 1]]);
+                        pixels[p_count] = (p, 0, idx / 2); // Store mask index
+
+                        let rgb = Rgb::from_rgb565(p);
+                        sum_r += rgb.r as u32;
+                        sum_g += rgb.g as u32;
+                        sum_b += rgb.b as u32;
+                        p_count += 1;
                     }
                 }
             }
-            if best_cy as usize * width + (best_cx as usize) < m.len() {
-                m[best_cy as usize * width + (best_cx as usize)] = 4;
-            }
         }
 
+        if let Some(m) = &mut mask {
+            m[cy as usize * width + cx as usize] = 4; // Blue Center
+        }
+
+        if p_count > 0 {
+            let mean_r = (sum_r / p_count as u32) as i32;
+            let mean_g = (sum_g / p_count as u32) as i32;
+            let mean_b = (sum_b / p_count as u32) as i32;
+
+            // 2. Calculate Distance from Mean for each pixel
+            for i in 0..p_count {
+                let p = pixels[i].0;
+                let rgb = Rgb::from_rgb565(p);
+                let dr = (rgb.r as i32 - mean_r).pow(2);
+                let dg = (rgb.g as i32 - mean_g).pow(2);
+                let db = (rgb.b as i32 - mean_b).pow(2);
+                pixels[i].1 = (dr + dg + db) as u32;
+            }
+
+            // 3. Sort by Distance (Simple Insertion Sort for small N)
+            for i in 1..p_count {
+                let mut j = i;
+                while j > 0 && pixels[j].1 < pixels[j - 1].1 {
+                    pixels.swap(j, j - 1);
+                    j -= 1;
+                }
+            }
+
+            // 4. Keep Best N% (Configurable)
+            let keep_count = (p_count as u32 * config.filter_percent as u32 / 100).max(1) as usize;
+
+            let mut f_sum_r = 0u32;
+            let mut f_sum_g = 0u32;
+            let mut f_sum_b = 0u32;
+            let mut f_sum_sq_r = 0u32;
+            let mut f_sum_sq_g = 0u32;
+            let mut f_sum_sq_b = 0u32;
+
+            for i in 0..keep_count {
+                let p = pixels[i].0;
+                let rgb = Rgb::from_rgb565(p);
+                let r = rgb.r as u32;
+                let g = rgb.g as u32;
+                let b = rgb.b as u32;
+
+                f_sum_r += r;
+                f_sum_g += g;
+                f_sum_b += b;
+                f_sum_sq_r += r * r;
+                f_sum_sq_g += g * g;
+                f_sum_sq_b += b * b;
+
+                // Update Mask with Kept Pixels
+                if let Some(m) = &mut mask {
+                    let m_idx = pixels[i].2;
+                    if m_idx < m.len() {
+                        m[m_idx] = 1; // Green
+                    }
+                }
+            }
+
+            let f_mean_r = f_sum_r / keep_count as u32;
+            let f_mean_g = f_sum_g / keep_count as u32;
+            let f_mean_b = f_sum_b / keep_count as u32;
+
+            let f_avg = Rgb {
+                r: f_mean_r as u8,
+                g: f_mean_g as u8,
+                b: f_mean_b as u8,
+            };
+
+            let f_var_r = (f_sum_sq_r / keep_count as u32).saturating_sub(f_mean_r * f_mean_r);
+            let f_var_g = (f_sum_sq_g / keep_count as u32).saturating_sub(f_mean_g * f_mean_g);
+            let f_var_b = (f_sum_sq_b / keep_count as u32).saturating_sub(f_mean_b * f_mean_b);
+            let f_total_variance = f_var_r + f_var_g + f_var_b;
+
+            // Debug Print for high variance
+            // if f_total_variance > 800 {
+            //      let _ = std::io::Write::write_fmt(&mut std::io::stdout(), format_args!("HighVariance: Rvar={} Gvar={} Bvar={} Tot={}\n", f_var_r, f_var_g, f_var_b, f_total_variance));
+            // }
+
+            best_stats = Some((f_avg, keep_count as u32, f_total_variance));
+        } else {
+            best_stats = None; // No pixels found in the best ring, so no stats
+        }
+    }
+
+    if let Some((avg, count, var)) = best_stats {
         return Some(BeadAnalysis {
             average_color: avg,
             pixel_count: count,
-            variance: variance,
+            variance: var,
         });
+    } else {
+        None
     }
-
-    None
 }

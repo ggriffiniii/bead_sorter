@@ -1,3 +1,3 @@
 [workspace]
-members = ["bsp", "fw", "sorter_logic", "tools/image_saver"]
+members = ["bsp", "fw", "sorter_logic", "tools/image_saver", "tools/manual_sorter"]
 resolver = "2"

@@ -1,0 +1,257 @@
+   Compiling sorter_logic v0.1.0 (/home/ggriffiniii/src/bead_sorter/sorter_logic)
+    Finished `release` profile [optimized] target(s) in 1.48s
+     Running `/home/ggriffiniii/src/bead_sorter/target/release/examples/simulation`
+Loading images from "image_data"...
+Loaded 282 beads.
+Running Analysis with Empty Detection (Constrained to 6 Palettes, Lab Match, Thresh 200, VarWeight 0.10)...
+Generating 'simulation_report.html'...
+Generating 'simulation_report.html'...
+DEBUG: bead_1766961539052.png (white) -> P0 (L:(80, -6, -5) V:2972) => D_Lab:0 D_Var:0 Tot:0
+DEBUG: bead_1766962798791.png (gray) -> P1 (L:(46, -7, -4) V:503) => D_Lab:0 D_Var:0 Tot:0
+DEBUG: bead_1766962785228.png (gray) -> P1 (L:(44, -6, -6) V:538) => D_Lab:50 D_Var:7 Tot:57
+DEBUG: bead_1766961929872.png (dark-purple) -> P2 (L:(32, 6, -23) V:750) => D_Lab:0 D_Var:0 Tot:0
+DEBUG: bead_1766961768714.png (light-purple) -> P3 (L:(58, 6, -24) V:873) => D_Lab:0 D_Var:0 Tot:0
+DEBUG: bead_1766961543561.png (white) -> P0 (L:(80, -7, -4) V:2800) => D_Lab:2 D_Var:34 Tot:36
+DEBUG: bead_1766960989106.png (black) -> P4 (L:(21, -2, 0) V:102) => D_Lab:0 D_Var:0 Tot:0
+DEBUG: bead_1766962042968.png (dark-purple) -> P2 (L:(32, 8, -25) V:739) => D_Lab:34 D_Var:2 Tot:36
+DEBUG: bead_1766962807844.png (gray) -> P1 (L:(45, -6, -6) V:631) => D_Lab:11 D_Var:27 Tot:38
+DEBUG: bead_1766962816895.png (gray) -> P1 (L:(46, -8, -6) V:644) => D_Lab:59 D_Var:5 Tot:64
+DEBUG: bead_1766961457615.png (white) -> P5 (L:(89, -11, -12) V:1444) => D_Lab:0 D_Var:0 Tot:0
+DEBUG: bead_1766962721896.png (gray) -> P1 (L:(46, -8, -7) V:623) => D_Lab:21 D_Var:10 Tot:31
+DEBUG: bead_1766962789739.png (gray) -> P1 (L:(46, -8, -7) V:612) => D_Lab:18 D_Var:6 Tot:24
+DEBUG: bead_1766962626929.png (gray) -> P1 (L:(46, -8, -7) V:584) => D_Lab:33 D_Var:19 Tot:52
+Full Palette Error: bead_1766962293449.png
+DEBUG: bead_1766962617877.png (gray) -> P1 (L:(47, -9, -8) V:580) => D_Lab:17 D_Var:2 Tot:19
+DEBUG: bead_1766961534510.png (white) -> P5 (L:(90, -12, -11) V:1196) => D_Lab:17 D_Var:49 Tot:66
+Full Palette Error: bead_1766962429143.png
+DEBUG: bead_1766961430495.png (white) -> P5 (L:(90, -13, -10) V:1110) => D_Lab:3 D_Var:25 Tot:28
+DEBUG: bead_1766961682806.png (light-purple) -> P3 (L:(58, 5, -23) V:711) => D_Lab:2 D_Var:32 Tot:34
+DEBUG: bead_1766961709927.png (light-purple) -> P3 (L:(57, 5, -23) V:740) => D_Lab:9 D_Var:9 Tot:18
+DEBUG: bead_1766961902752.png (dark-purple) -> P2 (L:(32, 10, -26) V:668) => D_Lab:62 D_Var:21 Tot:83
+DEBUG: bead_1766961052431.png (black) -> P4 (L:(21, -2, -1) V:116) => D_Lab:2 D_Var:2 Tot:4
+DEBUG: bead_1766961070532.png (black) -> P4 (L:(21, -2, -1) V:134) => D_Lab:1 D_Var:5 Tot:6
+DEBUG: bead_1766961979637.png (dark-purple) -> P2 (L:(32, 9, -25) V:682) => D_Lab:32 D_Var:5 Tot:37
+Full Palette Error: bead_1766962487937.png
+DEBUG: bead_1766961480227.png (white) -> P0 (L:(80, -6, -5) V:2957) => D_Lab:2 D_Var:47 Tot:49
+DEBUG: bead_1766961138372.png (black) -> P4 (L:(21, -2, 0) V:119) => D_Lab:69 D_Var:6 Tot:75
+DEBUG: bead_1766961435004.png (white) -> P0 (L:(79, -6, -4) V:3015) => D_Lab:14 D_Var:23 Tot:37
+DEBUG: bead_1766961750641.png (light-purple) -> P3 (L:(57, 5, -22) V:769) => D_Lab:9 D_Var:11 Tot:20
+Full Palette Error: bead_1766962506042.png
+DEBUG: bead_1766961142886.png (black) -> P4 (L:(21, -3, 0) V:148) => D_Lab:2 D_Var:14 Tot:16
+DEBUG: bead_1766961836564.png (light-purple) -> P3 (L:(57, 5, -21) V:722) => D_Lab:1 D_Var:23 Tot:24
+DEBUG: bead_1766960998157.png (black) -> P4 (L:(21, -3, 0) V:136) => D_Lab:25 D_Var:7 Tot:32
+Full Palette Error: bead_1766961687315.png
+DEBUG: bead_1766962654053.png (gray) -> P1 (L:(47, -9, -8) V:530) => D_Lab:11 D_Var:45 Tot:56
+Full Palette Error: bead_1766962519601.png
+DEBUG: bead_1766961714436.png (light-purple) -> P3 (L:(57, 5, -21) V:667) => D_Lab:5 D_Var:33 Tot:38
+DEBUG: bead_1766961489279.png (white) -> P5 (L:(90, -12, -11) V:974) => D_Lab:5 D_Var:54 Tot:59
+DEBUG: bead_1766961129347.png (black) -> P4 (L:(21, -2, 0) V:143) => D_Lab:0 D_Var:5 Tot:5
+DEBUG: bead_1766962015813.png (dark-purple) -> P2 (L:(32, 9, -25) V:675) => D_Lab:33 D_Var:3 Tot:36
+Full Palette Error: bead_1766962266324.png
+Full Palette Error: bead_1766962311552.png
+DEBUG: bead_1766962744509.png (gray) -> P1 (L:(46, -9, -8) V:578) => D_Lab:21 D_Var:48 Tot:69
+DEBUG: bead_1766962776175.png (gray) -> P1 (L:(46, -9, -8) V:572) => D_Lab:34 D_Var:7 Tot:41
+DEBUG: bead_1766961025310.png (black) -> P4 (L:(21, -3, 0) V:135) => D_Lab:25 D_Var:6 Tot:31
+Full Palette Error: bead_1766962515093.png
+DEBUG: bead_1766961102193.png (black) -> P4 (L:(21, -3, 0) V:129) => D_Lab:20 D_Var:5 Tot:25
+DEBUG: bead_1766962038426.png (dark-purple) -> P2 (L:(32, 9, -25) V:658) => D_Lab:82 D_Var:10 Tot:92
+Full Palette Error: bead_1766962338681.png
+DEBUG: bead_1766962663104.png (gray) -> P1 (L:(47, -8, -9) V:549) => D_Lab:18 D_Var:27 Tot:45
+DEBUG: bead_1766962029373.png (dark-purple) -> P2 (L:(32, 9, -25) V:669) => D_Lab:54 D_Var:8 Tot:62
+DEBUG: bead_1766961016258.png (black) -> P4 (L:(21, -5, 0) V:124) => D_Lab:30 D_Var:4 Tot:34
+DEBUG: bead_1766962052019.png (dark-purple) -> P2 (L:(32, 9, -25) V:666) => D_Lab:33 D_Var:2 Tot:35
+DEBUG: bead_1766961407880.png (white) -> P0 (L:(79, -6, -4) V:3107) => D_Lab:6 D_Var:46 Tot:52
+DEBUG: bead_1766962821404.png (gray) -> P1 (L:(47, -9, -8) V:530) => D_Lab:17 D_Var:25 Tot:42
+Full Palette Error: bead_1766961651142.png
+DEBUG: bead_1766962726438.png (gray) -> P1 (L:(46, -8, -8) V:557) => D_Lab:68 D_Var:37 Tot:105
+DEBUG: bead_1766962708334.png (gray) -> P1 (L:(46, -9, -8) V:542) => D_Lab:20 D_Var:21 Tot:41
+DEBUG: bead_1766961043379.png (black) -> P4 (L:(21, -3, 0) V:136) => D_Lab:2 D_Var:13 Tot:15
+Full Palette Error: bead_1766961791331.png
+DEBUG: bead_1766962640492.png (gray) -> P1 (L:(46, -9, -8) V:561) => D_Lab:37 D_Var:29 Tot:66
+DEBUG: bead_1766962020355.png (dark-purple) -> P2 (L:(32, 9, -25) V:656) => D_Lab:41 D_Var:8 Tot:49
+DEBUG: bead_1766961421441.png (white) -> P5 (L:(91, -14, -11) V:852) => D_Lab:24 D_Var:60 Tot:84
+DEBUG: bead_1766962794281.png (gray) -> P1 (L:(46, -8, -8) V:582) => D_Lab:5 D_Var:35 Tot:40
+DEBUG: bead_1766961938925.png (dark-purple) -> P2 (L:(32, 9, -25) V:650) => D_Lab:104 D_Var:5 Tot:109
+DEBUG: bead_1766961115752.png (black) -> P4 (L:(21, -5, 0) V:133) => D_Lab:13 D_Var:3 Tot:16
+DEBUG: bead_1766962758069.png (gray) -> P1 (L:(46, -9, -8) V:570) => D_Lab:20 D_Var:21 Tot:41
+DEBUG: bead_1766961741590.png (light-purple) -> P3 (L:(57, 5, -22) V:667) => D_Lab:3 D_Var:0 Tot:3
+DEBUG: bead_1766961466666.png (white) -> P5 (L:(90, -13, -12) V:862) => D_Lab:2 D_Var:6 Tot:8
+Full Palette Error: bead_1766962420090.png
+DEBUG: bead_1766962667613.png (gray) -> P1 (L:(46, -9, -8) V:578) => D_Lab:53 D_Var:14 Tot:67
+DEBUG: bead_1766962740000.png (gray) -> P1 (L:(46, -8, -8) V:597) => D_Lab:68 D_Var:39 Tot:107
+DEBUG: bead_1766961502839.png (white) -> P5 (L:(90, -13, -10) V:903) => D_Lab:8 D_Var:28 Tot:36
+Full Palette Error: bead_1766962528653.png
+DEBUG: bead_1766962649544.png (gray) -> P1 (L:(46, -8, -8) V:585) => D_Lab:17 D_Var:26 Tot:43
+Full Palette Error: bead_1766962456269.png
+DEBUG: bead_1766962730948.png (gray) -> P1 (L:(46, -9, -8) V:578) => D_Lab:21 D_Var:14 Tot:35
+Full Palette Error: bead_1766962474375.png
+Full Palette Error: bead_1766962451760.png
+Full Palette Error: bead_1766962365811.png
+DEBUG: bead_1766962753561.png (gray) -> P1 (L:(46, -9, -8) V:580) => D_Lab:20 D_Var:4 Tot:24
+DEBUG: bead_1766962146984.png (dark-purple) -> P2 (L:(32, 9, -25) V:657) => D_Lab:4 D_Var:7 Tot:11
+DEBUG: bead_1766962110812.png (dark-purple) -> P2 (L:(32, 9, -25) V:644) => D_Lab:14 D_Var:15 Tot:29
+DEBUG: bead_1766962676665.png (gray) -> P1 (L:(46, -9, -8) V:573) => D_Lab:34 D_Var:18 Tot:52
+DEBUG: bead_1766961120293.png (black) -> P4 (L:(21, -5, 0) V:143) => D_Lab:9 D_Var:13 Tot:22
+DEBUG: bead_1766962088195.png (dark-purple) -> P2 (L:(32, 9, -25) V:651) => D_Lab:5 D_Var:8 Tot:13
+DEBUG: bead_1766962119863.png (dark-purple) -> P2 (L:(32, 9, -25) V:659) => D_Lab:18 D_Var:10 Tot:28
+DEBUG: bead_1766961646597.png (light-purple) -> P3 (L:(57, 5, -20) V:777) => D_Lab:38 D_Var:88 Tot:126
+Full Palette Error: bead_1766962415581.png
+DEBUG: bead_1766962803302.png (gray) -> P1 (L:(46, -9, -8) V:574) => D_Lab:14 D_Var:4 Tot:18
+Full Palette Error: bead_1766962270834.png
+DEBUG: bead_1766960993648.png (black) -> P4 (L:(21, -3, 0) V:149) => D_Lab:2 D_Var:8 Tot:10
+DEBUG: bead_1766962749052.png (gray) -> P1 (L:(46, -9, -8) V:567) => D_Lab:20 D_Var:19 Tot:39
+DEBUG: bead_1766962070090.png (dark-purple) -> P2 (L:(32, 10, -26) V:643) => D_Lab:59 D_Var:23 Tot:82
+DEBUG: bead_1766961412389.png (white) -> P0 (L:(79, -6, -4) V:3115) => D_Lab:2 D_Var:4 Tot:6
+DEBUG: bead_1766961444055.png (white) -> P0 (L:(79, -6, -4) V:3198) => D_Lab:0 D_Var:58 Tot:58
+Full Palette Error: bead_1766962370354.png
+DEBUG: bead_1766961984150.png (dark-purple) -> P2 (L:(32, 10, -26) V:656) => D_Lab:26 D_Var:20 Tot:46
+Full Palette Error: bead_1766962374863.png
+Full Palette Error: bead_1766962356794.png
+DEBUG: bead_1766961111244.png (black) -> P4 (L:(21, -5, 0) V:148) => D_Lab:74 D_Var:2 Tot:76
+Full Palette Error: bead_1766962424633.png
+Full Palette Error: bead_1766962261782.png
+DEBUG: bead_1766961723487.png (light-purple) -> P3 (L:(57, 5, -20) V:761) => D_Lab:2 D_Var:13 Tot:15
+DEBUG: bead_1766961966079.png (dark-purple) -> P2 (L:(32, 10, -26) V:656) => D_Lab:9 D_Var:0 Tot:9
+DEBUG: bead_1766961907263.png (dark-purple) -> P2 (L:(32, 9, -26) V:673) => D_Lab:1 D_Var:31 Tot:32
+DEBUG: bead_1766962771665.png (gray) -> P1 (L:(46, -9, -8) V:565) => D_Lab:11 D_Var:5 Tot:16
+Full Palette Error: bead_1766961673755.png
+Full Palette Error: bead_1766962411039.png
+DEBUG: bead_1766961916312.png (dark-purple) -> P2 (L:(32, 10, -26) V:687) => D_Lab:1 D_Var:25 Tot:26
+DEBUG: bead_1766961975095.png (dark-purple) -> P2 (L:(32, 10, -26) V:698) => D_Lab:18 D_Var:22 Tot:40
+DEBUG: bead_1766961898209.png (dark-purple) -> P2 (L:(32, 10, -26) V:703) => D_Lab:5 D_Var:10 Tot:15
+DEBUG: bead_1766962133423.png (dark-purple) -> P2 (L:(32, 10, -26) V:714) => D_Lab:2 D_Var:25 Tot:27
+DEBUG: bead_1766961732538.png (light-purple) -> P3 (L:(57, 5, -20) V:725) => D_Lab:4 D_Var:35 Tot:39
+DEBUG: bead_1766962106270.png (dark-purple) -> P2 (L:(32, 10, -26) V:729) => D_Lab:0 D_Var:33 Tot:33
+Full Palette Error: bead_1766962279888.png
+Full Palette Error: bead_1766962483428.png
+DEBUG: bead_1766962690226.png (gray) -> P1 (L:(46, -9, -8) V:582) => D_Lab:94 D_Var:49 Tot:143
+DEBUG: bead_1766961079583.png (black) -> P4 (L:(21, -3, 0) V:149) => D_Lab:2 D_Var:1 Tot:3
+DEBUG: bead_1766961845618.png (light-purple) -> P3 (L:(57, 5, -20) V:713) => D_Lab:2 D_Var:13 Tot:15
+Full Palette Error: bead_1766962347742.png
+DEBUG: bead_1766962712843.png (gray) -> P1 (L:(46, -9, -8) V:588) => D_Lab:19 D_Var:15 Tot:34
+Full Palette Error: bead_1766961827512.png
+DEBUG: bead_1766961133857.png (black) -> P4 (L:(21, -5, 0) V:145) => D_Lab:13 D_Var:6 Tot:19
+DEBUG: bead_1766962622387.png (gray) -> P1 (L:(46, -9, -8) V:575) => D_Lab:14 D_Var:38 Tot:52
+DEBUG: bead_1766962685717.png (gray) -> P1 (L:(46, -9, -8) V:571) => D_Lab:20 D_Var:10 Tot:30
+DEBUG: bead_1766961970587.png (dark-purple) -> P2 (L:(32, 10, -26) V:716) => D_Lab:66 D_Var:29 Tot:95
+Full Palette Error: bead_1766961777768.png
+DEBUG: bead_1766961786820.png (light-purple) -> P3 (L:(57, 5, -20) V:731) => D_Lab:5 D_Var:22 Tot:27
+Full Palette Error: bead_1766962406529.png
+Full Palette Error: bead_1766962447251.png
+DEBUG: bead_1766962142475.png (dark-purple) -> P2 (L:(32, 10, -26) V:718) => D_Lab:13 D_Var:3 Tot:16
+DEBUG: bead_1766962092706.png (dark-purple) -> P2 (L:(32, 10, -26) V:714) => D_Lab:13 D_Var:10 Tot:23
+DEBUG: bead_1766961066023.png (black) -> P4 (L:(21, -5, 0) V:139) => D_Lab:30 D_Var:11 Tot:41
+DEBUG: bead_1766961056973.png (black) -> P4 (L:(21, -5, 0) V:145) => D_Lab:9 D_Var:12 Tot:21
+DEBUG: bead_1766961475717.png (white) -> P0 (L:(79, -6, -4) V:3168) => D_Lab:0 D_Var:24 Tot:24
+DEBUG: bead_1766961403338.png (white) -> P5 (L:(90, -13, -10) V:901) => D_Lab:21 D_Var:1 Tot:22
+Full Palette Error: bead_1766962352251.png
+DEBUG: bead_1766961832055.png (light-purple) -> P3 (L:(57, 5, -20) V:716) => D_Lab:4 D_Var:19 Tot:23
+DEBUG: bead_1766961804928.png (light-purple) -> P3 (L:(57, 5, -19) V:805) => D_Lab:49 D_Var:124 Tot:173
+DEBUG: bead_1766961718978.png (light-purple) -> P3 (L:(57, 5, -20) V:795) => D_Lab:26 D_Var:15 Tot:41
+DEBUG: bead_1766961655651.png (light-purple) -> P3 (L:(57, 5, -20) V:764) => D_Lab:5 D_Var:49 Tot:54
+DEBUG: bead_1766961385267.png (white) -> P5 (L:(90, -13, -10) V:962) => D_Lab:6 D_Var:55 Tot:61
+DEBUG: bead_1766961525453.png (white) -> P5 (L:(90, -13, -10) V:899) => D_Lab:35 D_Var:62 Tot:97
+Full Palette Error: bead_1766962433655.png
+DEBUG: bead_1766961416932.png (white) -> P5 (L:(90, -13, -10) V:900) => D_Lab:5 D_Var:1 Tot:6
+DEBUG: bead_1766961516434.png (white) -> P0 (L:(79, -6, -4) V:3149) => D_Lab:0 D_Var:17 Tot:17
+DEBUG: bead_1766962006762.png (dark-purple) -> P2 (L:(32, 10, -26) V:707) => D_Lab:62 D_Var:17 Tot:79
+Full Palette Error: bead_1766962325114.png
+DEBUG: bead_1766961511890.png (white) -> P0 (L:(79, -6, -4) V:3146) => D_Lab:2 D_Var:3 Tot:5
+DEBUG: bead_1766962694768.png (gray) -> P1 (L:(46, -9, -8) V:580) => D_Lab:94 D_Var:27 Tot:121
+DEBUG: bead_1766961507382.png (white) -> P0 (L:(79, -6, -4) V:3199) => D_Lab:0 D_Var:58 Tot:58
+DEBUG: bead_1766962767122.png (gray) -> P1 (L:(46, -9, -8) V:576) => D_Lab:21 D_Var:10 Tot:31
+DEBUG: bead_1766961934416.png (dark-purple) -> P2 (L:(32, 10, -26) V:706) => D_Lab:9 D_Var:5 Tot:14
+DEBUG: bead_1766961800385.png (light-purple) -> P3 (L:(57, 5, -20) V:755) => D_Lab:5 D_Var:15 Tot:20
+DEBUG: bead_1766962812353.png (gray) -> P1 (L:(46, -9, -8) V:573) => D_Lab:21 D_Var:12 Tot:33
+DEBUG: bead_1766961020768.png (black) -> P4 (L:(21, -5, 0) V:150) => D_Lab:9 D_Var:10 Tot:19
+DEBUG: bead_1766961498330.png (white) -> P5 (L:(90, -13, -10) V:897) => D_Lab:5 D_Var:4 Tot:9
+DEBUG: bead_1766962047477.png (dark-purple) -> P2 (L:(32, 10, -26) V:711) => D_Lab:18 D_Var:14 Tot:32
+DEBUG: bead_1766962703825.png (gray) -> P1 (L:(46, -9, -8) V:580) => D_Lab:99 D_Var:23 Tot:122
+DEBUG: bead_1766962011304.png (dark-purple) -> P2 (L:(32, 10, -26) V:713) => D_Lab:2 D_Var:7 Tot:9
+DEBUG: bead_1766961818492.png (light-purple) -> P3 (L:(57, 5, -20) V:748) => D_Lab:0 D_Var:12 Tot:12
+DEBUG: bead_1766961696366.png (light-purple) -> P3 (L:(57, 5, -19) V:821) => D_Lab:27 D_Var:138 Tot:165
+DEBUG: bead_1766962645001.png (gray) -> P1 (L:(46, -9, -8) V:576) => D_Lab:34 D_Var:12 Tot:46
+DEBUG: bead_1766961669211.png (light-purple) -> P3 (L:(57, 5, -20) V:812) => D_Lab:10 D_Var:18 Tot:28
+Full Palette Error: bead_1766962442706.png
+DEBUG: bead_1766962635949.png (gray) -> P1 (L:(46, -9, -8) V:567) => D_Lab:21 D_Var:31 Tot:52
+DEBUG: bead_1766961911803.png (dark-purple) -> P2 (L:(32, 10, -26) V:706) => D_Lab:73 D_Var:22 Tot:95
+Full Palette Error: bead_1766962284397.png
+DEBUG: bead_1766961728029.png (light-purple) -> P3 (L:(57, 5, -19) V:808) => D_Lab:2 D_Var:8 Tot:10
+DEBUG: bead_1766961398829.png (white) -> P5 (L:(91, -15, -9) V:884) => D_Lab:13 D_Var:17 Tot:30
+DEBUG: bead_1766961988693.png (dark-purple) -> P2 (L:(32, 10, -26) V:708) => D_Lab:5 D_Var:9 Tot:14
+DEBUG: bead_1766962825946.png (gray) -> P1 (L:(46, -9, -8) V:574) => D_Lab:94 D_Var:23 Tot:117
+DEBUG: bead_1766961007208.png (black) -> P4 (L:(21, -5, 0) V:145) => D_Lab:66 D_Var:12 Tot:78
+Full Palette Error: bead_1766962402020.png
+Full Palette Error: bead_1766962288940.png
+DEBUG: bead_1766962699277.png (gray) -> P1 (L:(46, -9, -8) V:567) => D_Lab:20 D_Var:26 Tot:46
+DEBUG: bead_1766962033916.png (dark-purple) -> P2 (L:(32, 10, -26) V:709) => D_Lab:26 D_Var:3 Tot:29
+DEBUG: bead_1766961011749.png (black) -> P4 (L:(21, -5, 0) V:141) => D_Lab:13 D_Var:8 Tot:21
+DEBUG: bead_1766961061481.png (black) -> P4 (L:(21, -6, 0) V:137) => D_Lab:10 D_Var:9 Tot:19
+DEBUG: bead_1766961952486.png (dark-purple) -> P2 (L:(32, 9, -26) V:715) => D_Lab:26 D_Var:18 Tot:44
+DEBUG: bead_1766960984598.png (black) -> P4 (L:(21, -6, 0) V:137) => D_Lab:16 D_Var:0 Tot:16
+Full Palette Error: bead_1766962465320.png
+Full Palette Error: bead_1766962478883.png
+Full Palette Error: bead_1766962397477.png
+Full Palette Error: bead_1766962524145.png
+DEBUG: bead_1766961106701.png (black) -> P4 (L:(21, -6, 0) V:139) => D_Lab:17 D_Var:6 Tot:23
+Full Palette Error: bead_1766962329627.png
+DEBUG: bead_1766962631439.png (gray) -> P1 (L:(46, -9, -8) V:561) => D_Lab:30 D_Var:21 Tot:51
+DEBUG: bead_1766961957029.png (dark-purple) -> P2 (L:(32, 9, -26) V:715) => D_Lab:42 D_Var:1 Tot:43
+Full Palette Error: bead_1766962383914.png
+DEBUG: bead_1766961493821.png (white) -> P0 (L:(79, -6, -4) V:3218) => D_Lab:1 D_Var:23 Tot:24
+DEBUG: bead_1766962780685.png (gray) -> P1 (L:(46, -9, -8) V:560) => D_Lab:10 D_Var:6 Tot:16
+DEBUG: bead_1766961047920.png (black) -> P4 (L:(21, -6, 0) V:137) => D_Lab:21 D_Var:6 Tot:27
+DEBUG: bead_1766961529997.png (white) -> P5 (L:(91, -14, -11) V:866) => D_Lab:2 D_Var:24 Tot:26
+DEBUG: bead_1766962061038.png (dark-purple) -> P2 (L:(32, 9, -26) V:720) => D_Lab:25 D_Var:20 Tot:45
+DEBUG: bead_1766961038870.png (black) -> P4 (L:(21, -6, 0) V:143) => D_Lab:4 D_Var:15 Tot:19
+DEBUG: bead_1766961453106.png (white) -> P5 (L:(91, -14, -11) V:839) => D_Lab:8 D_Var:41 Tot:49
+DEBUG: bead_1766962658595.png (gray) -> P1 (L:(46, -9, -8) V:556) => D_Lab:34 D_Var:14 Tot:48
+DEBUG: bead_1766961124802.png (black) -> P4 (L:(21, -6, 0) V:147) => D_Lab:16 D_Var:11 Tot:27
+DEBUG: bead_1766961660160.png (light-purple) -> P3 (L:(57, 5, -20) V:806) => D_Lab:9 D_Var:3 Tot:12
+DEBUG: bead_1766962128881.png (dark-purple) -> P2 (L:(32, 9, -25) V:719) => D_Lab:19 D_Var:2 Tot:21
+DEBUG: bead_1766961678265.png (light-purple) -> P3 (L:(57, 5, -19) V:860) => D_Lab:59 D_Var:123 Tot:182
+DEBUG: bead_1766962074632.png (dark-purple) -> P2 (L:(32, 9, -26) V:715) => D_Lab:30 D_Var:17 Tot:47
+DEBUG: bead_1766961943435.png (dark-purple) -> P2 (L:(32, 9, -25) V:714) => D_Lab:19 D_Var:1 Tot:20
+DEBUG: bead_1766962762612.png (gray) -> P1 (L:(46, -9, -8) V:554) => D_Lab:14 D_Var:8 Tot:22
+DEBUG: bead_1766961755151.png (light-purple) -> P3 (L:(57, 4, -18) V:911) => D_Lab:29 D_Var:123 Tot:152
+DEBUG: bead_1766961462157.png (white) -> P5 (L:(90, -13, -10) V:876) => D_Lab:2 D_Var:60 Tot:62
+DEBUG: bead_1766961002699.png (black) -> P4 (L:(21, -6, 0) V:143) => D_Lab:10 D_Var:10 Tot:20
+DEBUG: bead_1766961764203.png (light-purple) -> P3 (L:(57, 4, -18) V:895) => D_Lab:17 D_Var:40 Tot:57
+DEBUG: bead_1766961746099.png (light-purple) -> P3 (L:(57, 5, -19) V:897) => D_Lab:27 D_Var:4 Tot:31
+Full Palette Error: bead_1766962492480.png
+Full Palette Error: bead_1766962438196.png
+Full Palette Error: bead_1766962460811.png
+Full Palette Error: bead_1766962334172.png
+DEBUG: bead_1766961029819.png (black) -> P4 (L:(21, -6, 0) V:148) => D_Lab:16 D_Var:15 Tot:31
+DEBUG: bead_1766961394320.png (white) -> P0 (L:(79, -6, -4) V:3251) => D_Lab:6 D_Var:42 Tot:48
+DEBUG: bead_1766961782310.png (light-purple) -> P3 (L:(57, 5, -19) V:902) => D_Lab:2 D_Var:13 Tot:15
+DEBUG: bead_1766961664702.png (light-purple) -> P3 (L:(57, 5, -19) V:884) => D_Lab:27 D_Var:49 Tot:76
+DEBUG: bead_1766961520944.png (white) -> P0 (L:(79, -6, -4) V:3233) => D_Lab:6 D_Var:25 Tot:31
+DEBUG: bead_1766962830455.png (gray) -> P1 (L:(46, -9, -8) V:552) => D_Lab:29 D_Var:9 Tot:38
+DEBUG: bead_1766961471208.png (white) -> P5 (L:(91, -14, -11) V:863) => D_Lab:11 D_Var:23 Tot:34
+DEBUG: bead_1766961920821.png (dark-purple) -> P2 (L:(32, 9, -25) V:716) => D_Lab:6 D_Var:8 Tot:14
+DEBUG: bead_1766961925363.png (dark-purple) -> P2 (L:(32, 9, -25) V:718) => D_Lab:26 D_Var:7 Tot:33
+DEBUG: bead_1766961809440.png (light-purple) -> P3 (L:(57, 5, -19) V:881) => D_Lab:16 D_Var:9 Tot:25
+DEBUG: bead_1766961813950.png (light-purple) -> P3 (L:(57, 5, -19) V:862) => D_Lab:38 D_Var:55 Tot:93
+DEBUG: bead_1766961075041.png (black) -> P4 (L:(21, -6, 0) V:148) => D_Lab:17 D_Var:1 Tot:18
+DEBUG: bead_1766962097219.png (dark-purple) -> P2 (L:(32, 9, -25) V:719) => D_Lab:76 D_Var:5 Tot:81
+DEBUG: bead_1766961389777.png (white) -> P5 (L:(91, -14, -11) V:850) => D_Lab:3 D_Var:23 Tot:26
+Full Palette Error: bead_1766962297991.png
+DEBUG: bead_1766961823001.png (light-purple) -> P3 (L:(57, 5, -19) V:846) => D_Lab:16 D_Var:51 Tot:67
+DEBUG: bead_1766961947977.png (dark-purple) -> P2 (L:(32, 9, -26) V:716) => D_Lab:14 D_Var:12 Tot:26
+Full Palette Error: bead_1766962392969.png
+DEBUG: bead_1766961795876.png (light-purple) -> P3 (L:(57, 5, -20) V:845) => D_Lab:9 D_Var:0 Tot:9
+DEBUG: bead_1766962101761.png (dark-purple) -> P2 (L:(32, 9, -25) V:715) => D_Lab:33 D_Var:4 Tot:37
+DEBUG: bead_1766961961537.png (dark-purple) -> P2 (L:(32, 9, -26) V:715) => D_Lab:13 D_Var:1 Tot:14
+DEBUG: bead_1766961448564.png (white) -> P0 (L:(79, -6, -4) V:3209) => D_Lab:2 D_Var:35 Tot:37
+DEBUG: bead_1766961034361.png (black) -> P4 (L:(21, -6, 0) V:145) => D_Lab:10 D_Var:8 Tot:18
+DEBUG: bead_1766961484770.png (white) -> P0 (L:(79, -6, -4) V:3199) => D_Lab:0 D_Var:16 Tot:16
+Full Palette Error: bead_1766962379405.png
+Total Processed: 241
+Empty / Rejected: 41
+Valid Dataset Size: 241
+Assigned Correctly: 187
+Assigned Incorrectly (Collisions): 0
+Unclassified (Palette Full): 54
+STRICT ACCURACY (Correct / Valid): 77.59%
+Report generated.

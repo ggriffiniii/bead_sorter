@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bead Sorter - Manual Correction Tool</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #222;
+            color: #eee;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 10px;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #444;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #finalize-btn {
+            background: #28a745;
+        }
+
+        #finalize-btn:hover {
+            background: #218838;
+        }
+
+        #board {
+            display: flex;
+            flex: 1;
+            overflow-x: auto;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        .column {
+            min-width: 160px;
+            background: #2a2a2a;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #444;
+        }
+
+        .column-header {
+            padding: 8px;
+            background: #3a3a3a;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #555;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .bead-list {
+            flex: 1;
+            padding: 5px;
+            overflow-y: auto;
+            min-height: 100px;
+        }
+
+        .bead-card {
+            background: #111;
+            margin-bottom: 6px;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: grab;
+            border: 2px solid transparent;
+            text-align: center;
+        }
+
+        .bead-card:active {
+            cursor: grabbing;
+        }
+
+        .bead-card img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .bead-info {
+            font-size: 0.75rem;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        /* Dragging visuals */
+        .column.drag-over {
+            background: #444;
+            border-color: #888;
+        }
+
+        .bead-card.dragging {
+            opacity: 0.5;
+            border: 2px dashed #888;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Manual Sorter</h1>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button onclick="addPalette()">+ Add Palette</button>
+            <div id="status">Loading...</div>
+        </div>
+        <button id="finalize-btn" onclick="finalizeSort()">Finalize & Save</button>
+    </header>
+    <div id="board">
+        <!-- Columns will be injected here -->
+    </div>
+
+    <script>
+        let beads = [];
+        let paletteCount = 30;
+
+        async function init() {
+            // Create Columns
+            const board = document.getElementById('board');
+
+            // Empty Column
+            createColumn(board, 'empty', 'Empty / No Bead');
+
+            // Unclassified Column
+            createColumn(board, 'unclassified', 'Unclassified');
+
+            // Palette Columns
+            for (let i = 0; i < paletteCount; i++) {
+                createColumn(board, `p${i}`, `Palette ${i}`);
+            }
+
+            // Fetch State
+            const resp = await fetch('/api/state');
+            beads = await resp.json();
+
+            // Check if any bead is assigned to higher palette somehow
+            beads.forEach(b => {
+                if (b.assignment.startsWith('p')) {
+                    const idx = parseInt(b.assignment.substring(1));
+                    if (idx >= paletteCount) {
+                        // Expand existing columns if needed
+                        for (let k = paletteCount; k <= idx; k++) {
+                            createColumn(board, `p${k}`, `Palette ${k}`);
+                        }
+                        paletteCount = idx + 1;
+                    }
+                }
+            });
+
+            renderBeads();
+            document.getElementById('status').innerText = `Loaded ${beads.length} beads`;
+        }
+
+        function addPalette() {
+            const board = document.getElementById('board');
+            createColumn(board, `p${paletteCount}`, `Palette ${paletteCount}`);
+            paletteCount++;
+        }
+
+        function createColumn(board, id, title) {
+            const col = document.createElement('div');
+            col.className = 'column';
+            col.id = id;
+            col.dataset.assignment = id; // id is "p0", "empty", etc
+
+            // Header is draggable for column reordering
+            col.innerHTML = `
+                <div class="column-header" draggable="true" ondragstart="handleColDragStart(event, '${id}')">
+                    ${title} <span class="count">(0)</span>
+                    <span style="font-size:0.8em; color:#888; cursor:grab">☰</span>
+                </div>
+                <div class="bead-list"></div>
+            `;
+
+            // Drop Handlers for BEADS or COLUMNS
+            col.ondragover = handleDragOver;
+            col.ondragleave = handleDragLeave;
+            col.ondrop = handleDrop;
+
+            board.appendChild(col);
+        }
+
+        function handleColDragStart(e, id) {
+            e.dataTransfer.setData('column-id', id);
+            e.dataTransfer.effectAllowed = 'move';
+            e.target.closest('.column').classList.add('dragging-col');
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); // Allow drop
+            this.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function renderBeads() {
+            // Clear lists (but keep columns!)
+            // Wait, if we clear innerHTML of lists we are fine.
+            document.querySelectorAll('.bead-list').forEach(el => el.innerHTML = '');
+
+            beads.forEach(bead => {
+                const card = document.createElement('div');
+                card.className = 'bead-card';
+                card.draggable = true;
+                card.id = `bead-${bead.id}`;
+                card.innerHTML = `
+                    <img src="/images/${bead.filename}" loading="lazy">
+                    <div class="bead-info">Var: ${bead.variance}</div>
+                `;
+
+                // Drag Events
+                card.ondragstart = e => {
+                    e.dataTransfer.setData('bead-id', bead.id); // Specific type
+                    card.classList.add('dragging');
+                    e.stopPropagation(); // Don't trigger column drag
+                };
+                card.ondragend = e => {
+                    card.classList.remove('dragging');
+                    document.querySelectorAll('.column').forEach(c => c.classList.remove('drag-over'));
+                };
+
+                // Append to correct column
+                let targetId = bead.assignment;
+                const col = document.getElementById(targetId);
+                if (col) {
+                    col.querySelector('.bead-list').appendChild(card);
+                } else {
+                    console.warn('Unknown column:', targetId);
+                }
+            });
+
+            updateCounts();
+        }
+
+        function updateCounts() {
+            document.querySelectorAll('.column').forEach(col => {
+                const count = col.querySelectorAll('.bead-card').length;
+                col.querySelector('.count').innerText = `(${count})`;
+            });
+        }
+
+        async function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            const colId = e.dataTransfer.getData('column-id');
+            const beadIdStr = e.dataTransfer.getData('bead-id');
+
+            // Case 1: Column Reorder
+            if (colId) {
+                const srcCol = document.getElementById(colId);
+                const destCol = this; // 'this' is the column div
+
+                if (srcCol && destCol && srcCol !== destCol) {
+                    const board = document.getElementById('board');
+                    // Insert srcCol before or after destCol?
+                    // Let's just insertBefore destCol for simplicity, or after if dragging right.
+                    // Simple swap logic:
+                    // Get all columns
+                    const cols = Array.from(board.children);
+                    const srcIdx = cols.indexOf(srcCol);
+                    const destIdx = cols.indexOf(destCol);
+
+                    if (srcIdx < destIdx) {
+                        destCol.after(srcCol);
+                    } else {
+                        destCol.before(srcCol);
+                    }
+                }
+                srcCol.classList.remove('dragging-col');
+                return;
+            }
+
+            // Case 2: Bead Move
+            if (beadIdStr) {
+                const beadId = parseInt(beadIdStr);
+                const targetAssignment = this.dataset.assignment;
+
+                // Optimistic Update
+                const bead = beads.find(b => b.id === beadId);
+                if (!bead) return;
+
+                if (bead.assignment === targetAssignment) return;
+
+                const oldAssignment = bead.assignment;
+                bead.assignment = targetAssignment;
+
+                // Move DOM Element
+                const card = document.getElementById(`bead-${beadId}`);
+                if (card) {
+                    this.querySelector('.bead-list').appendChild(card);
+                    updateCounts();
+
+                    // API Call
+                    try {
+                        const resp = await fetch('/api/move', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ bead_id: beadId, target_assignment: targetAssignment })
+                        });
+                        if (!resp.ok) throw new Error('Failed');
+                    } catch (err) {
+                        console.error(err);
+                        bead.assignment = oldAssignment;
+                        renderBeads();
+                        alert('Move failed!');
+                    }
+                }
+            }
+        }
+
+        async function finalizeSort() {
+            if (!confirm("Are you sure you want to finalize? This will copy files to the output directory.")) return;
+
+            document.getElementById('finalize-btn').disabled = true;
+            document.getElementById('finalize-btn').innerText = "Processing...";
+
+            const resp = await fetch('/api/finalize', { method: 'POST' });
+            const msg = await resp.text();
+            alert(msg);
+            document.getElementById('finalize-btn').innerText = "Finalize & Save";
+            document.getElementById('finalize-btn').disabled = false;
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

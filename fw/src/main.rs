@@ -165,7 +165,10 @@ async fn main(_spawner: Spawner) {
         .await;
 
         // Sorting State
-        let mut palette: Palette<30> = Palette::new();
+        let mut palette: Palette<128> = Palette::new();
+        let mut tubes: heapless::Vec<sorter_logic::PaletteEntry, 30> = heapless::Vec::new();
+        // Index is PaletteID, Value is TubeID. 0xFF = None
+        let mut palette_to_tube: [u8; 128] = [0xFF; 128];
 
         // Sorting Loop
         if class.dtr() {
@@ -225,54 +228,72 @@ async fn main(_spawner: Spawner) {
 
             let _ = class.write_packet(b"Captured\r\n").await;
 
-            // Real Classification
             let analysis = analyze_image(buf_bytes, 40, 30); // 40x30 resolution
 
             // Default to Bin 0 (Waste/Unclassified) if analysis fails
             let mut tube_index = 0;
 
-            // --- Palette to Tube Mapping ---
-            // Logical Palettes (0..29) -> Physical Tubes (0..29)
-            // Default: 1-to-1 mapping (Logical Palette i -> Tube i)
-            // This map can be modified at runtime (e.g. via USB command) to merge palettes.
-            // For example, if P1 and P6 are both "White", set tube_map[6] = 1 to route both to Tube 1.
-            let mut tube_map: [u8; 30] = [0; 30];
-            for i in 0..30 {
-                tube_map[i] = i as u8;
-            }
-
             if let Some(ana) = analysis {
-                // Adaptive Learning (Conservative)
-                let threshold = 200;
-                let learn_threshold = 50;
+                // Adaptive Learning
+                let match_result = palette.match_color(&ana.average_color, ana.variance, 15);
 
-                match palette.match_color(&ana.average_color, ana.variance, threshold) {
-                    PaletteMatch::Match(i) => {
-                        // Only update if very close to prevent drift
-                        if let Some(current) = palette.get(i) {
-                            if ana.average_color.dist(&current) < learn_threshold {
-                                palette.add_sample(i, &ana.average_color, ana.variance);
+                let p_idx = match match_result {
+                    PaletteMatch::Match(i) => Some(i),
+                    PaletteMatch::NewEntry(i) => Some(i),
+                    PaletteMatch::Full => None, // Palette Full -> Unclassified (Tube 0)
+                };
+
+                if let Some(idx) = p_idx {
+                    // Update Learning
+                    palette.add_sample(idx, &ana.average_color, ana.variance);
+
+                    // Map to Tube
+                    let tid = if palette_to_tube[idx] != 0xFF {
+                        palette_to_tube[idx] as usize
+                    } else {
+                        // New Palette, assign tube
+                        if tubes.len() < 30 {
+                            // New Tube
+                            // Note: Firmware needs PaletteEntry struct too.
+                            // Assuming sorter_logic exposes PaletteEntry publicly (it does).
+                            // But struct construction might differ without 'new'?
+                            // sorter_logic::PaletteEntry::new(rgb, var)
+                            // We need to import PaletteEntry.
+                            let entry =
+                                sorter_logic::PaletteEntry::new(ana.average_color, ana.variance);
+                            let _ = tubes.push(entry);
+                            tubes.len() - 1
+                        } else {
+                            // Find closest tube
+                            let mut best_t = 0;
+                            let mut min_d = u32::MAX;
+                            for (t_i, t_entry) in tubes.iter().enumerate() {
+                                let (t_avg, _) = t_entry.avg();
+                                let d = ana.average_color.dist_lab(&t_avg);
+                                if d < min_d {
+                                    min_d = d;
+                                    best_t = t_i;
+                                }
                             }
+                            best_t
                         }
-                        if i < tube_map.len() {
-                            tube_index = tube_map[i];
-                        }
+                    };
+
+                    if idx < 128 {
+                        palette_to_tube[idx] = tid as u8;
                     }
-                    PaletteMatch::NewEntry(i) => {
-                        if i < tube_map.len() {
-                            tube_index = tube_map[i];
-                        }
+
+                    // Update Tube Stats
+                    if tid < tubes.len() {
+                        tubes[tid].add(ana.average_color, ana.variance);
                     }
-                    PaletteMatch::Full => {
-                        // Palette full, use Bin 0 as overflow
-                        tube_index = 0;
-                    }
+
+                    tube_index = tid as u8;
                 }
             }
 
             // Send classification info
             // let mut msg = String::<64>::new();
-            // write!(&mut msg, "Bin: {}\r\n", tube_index).unwrap();
             // let _ = class.write_packet(msg.as_bytes()).await;
 
             let chute_target = get_chute_pos(tube_index);

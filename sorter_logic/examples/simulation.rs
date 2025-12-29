@@ -1,5 +1,5 @@
 use image::RgbaImage;
-use sorter_logic::{AnalysisConfig, Palette, PaletteMatch, Rgb, analyze_image_debug};
+use sorter_logic::{AnalysisConfig, Palette, PaletteEntry, PaletteMatch, Rgb, analyze_image_debug};
 use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File};
@@ -9,7 +9,7 @@ use walkdir::WalkDir;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let default_path = "image_data".to_string();
+    let default_path = "image_data/full_sorted".to_string();
     let data_dir_word = args.get(1).unwrap_or(&default_path);
     let data_dir = Path::new(data_dir_word);
 
@@ -47,7 +47,7 @@ fn main() {
     println!("Loaded {} beads.", images.len());
 
     // --- Simulation Param ---
-    let mut palette: Palette<6> = Palette::new(); // User Constraint: 6 Palettes
+    let mut palette: Palette<128> = Palette::new(); // 128 Palettes allowed, will cluster to 30
 
     let mut total_processed = 0;
     let mut valid_dataset_size = 0;
@@ -58,54 +58,7 @@ fn main() {
     let mut collision_errors = 0;
     let mut empty_count = 0;
 
-    // User-provided list of Empty/Invalid images to ignore in scoring
-    const IGNORE_LIST: &[&str] = &[
-        "bead_1766961084091.png",
-        "bead_1766961088634.png",
-        "bead_1766961097684.png",
-        "bead_1766961093142.png",
-        "bead_1766962257269.png",
-        "bead_1766962275377.png",
-        "bead_1766962302499.png",
-        "bead_1766962307043.png",
-        "bead_1766962343225.png",
-        "bead_1766962361303.png",
-        "bead_1766962320606.png",
-        "bead_1766962316061.png",
-        "bead_1766962388426.png",
-        "bead_1766962469862.png",
-        "bead_1766962496989.png",
-        "bead_1766962501531.png",
-        "bead_1766962510551.png",
-        "bead_1766961993202.png",
-        "bead_1766961997711.png",
-        "bead_1766962024864.png",
-        "bead_1766962002253.png",
-        "bead_1766962079141.png",
-        "bead_1766962083653.png",
-        "bead_1766962056528.png",
-        "bead_1766962065580.png",
-        "bead_1766962137932.png",
-        "bead_1766962124372.png",
-        "bead_1766962115321.png",
-        "bead_1766962672155.png",
-        "bead_1766962681209.png",
-        "bead_1766962717385.png",
-        "bead_1766962735457.png",
-        "bead_1766961691824.png",
-        "bead_1766961700875.png",
-        "bead_1766961705418.png",
-        "bead_1766961737080.png",
-        "bead_1766961773256.png",
-        "bead_1766961759694.png",
-        "bead_1766961841107.png",
-        "bead_1766961439546.png",
-        "bead_1766961425952.png",
-    ];
-
-    println!(
-        "Running Analysis with Empty Detection (Constrained to 6 Palettes, Lab Match, Thresh 200, VarWeight 0.10)..."
-    );
+    println!("Running Analysis (30 Palettes, Lab Match, Thresh 200, VarWeight 0.10)...");
     println!("Generating 'simulation_report.html'...");
 
     // ... (HTML gen is assumed done in previous step) ...
@@ -177,9 +130,14 @@ fn main() {
     // Ensure assets dir exists
     fs::create_dir_all("simulation_report_assets").ok();
 
+    // Tube ID -> Tube Stats (Weighted Average of everything dropped in it)
+    let mut tubes: Vec<PaletteEntry> = Vec::new(); // Max 30
+    // Palette ID -> Tube ID
+    let mut palette_to_tube: HashMap<usize, usize> = HashMap::new();
+    let max_phys_tubes = 30;
+
     for (path, data, width, height) in images.iter() {
         let filename = path.file_name().unwrap().to_string_lossy().to_string();
-        let is_ignored = IGNORE_LIST.contains(&filename.as_str());
         let truth_category = path
             .parent()
             .unwrap()
@@ -188,20 +146,11 @@ fn main() {
             .to_string_lossy()
             .to_string();
 
+        let is_empty_image = truth_category == "empty";
+
         // Use Actual Dimensions
         let (width, height) = (*width, *height);
         let mut mask = vec![0u8; width * height];
-
-        if is_ignored {
-            let abs_path = fs::canonicalize(path).unwrap();
-            filtered_images.push(format!(
-                 "<div class='bead-container filtered'><img src='file://{}' class='img-box'><br><small>{} (Ignored)</small></div>",
-                 abs_path.to_string_lossy(),
-                 truth_category
-             ));
-            empty_count += 1;
-            continue;
-        }
 
         let analysis = analyze_image_debug(
             data,
@@ -214,7 +163,8 @@ fn main() {
         total_processed += 1;
 
         if let Some(ana) = analysis {
-            let match_result = palette.match_color(&ana.average_color, ana.variance, 200);
+            // Adaptive Threshold: 15
+            let match_result = palette.match_color(&ana.average_color, ana.variance, 15);
 
             let p_idx = match match_result {
                 PaletteMatch::Match(i) => Some(i),
@@ -222,7 +172,7 @@ fn main() {
                 PaletteMatch::Full => None,
             };
 
-            // Generate Report HTML Snippet (Common for matched and unmatched)
+            // Generate Report HTML Snippet
             let mut mask_img = RgbaImage::new(width as u32, height as u32);
             for y in 0..height {
                 for x in 0..width {
@@ -244,7 +194,7 @@ fn main() {
 
             let html_entry = format!(
                 "<div class='bead-container {}'><div class='img-wrapper' onclick='toggleMask(this)'><img src='file://{}' class='img-box'><img src='file://{}' class='mask-overlay'></div><div class='color-swatch' style='background-color: rgb({},{},{})'></div><small>{}</small></div>",
-                if is_ignored { "filtered" } else { "" },
+                if is_empty_image { "filtered" } else { "" },
                 abs_bead_path.to_string_lossy(),
                 abs_path.to_string_lossy(),
                 ana.average_color.r,
@@ -254,47 +204,87 @@ fn main() {
             );
 
             if let Some(idx) = p_idx {
-                // Update Learning (Only if not ignored)
-                if !is_ignored {
+                // Update Palette Learning (Only if not ignored)
+                if !is_empty_image {
                     palette.add_sample(idx, &ana.average_color, ana.variance);
                 }
 
-                // Calc Stats
+                // --- ONLINE TUBE ASSIGNMENT ---
+                // Determine which Tube this Palette belongs to
+                let tube_id = if let Some(tid) = palette_to_tube.get(&idx) {
+                    *tid
+                } else {
+                    // New Palette! Assign to a Tube.
+                    let new_tid = if tubes.len() < max_phys_tubes {
+                        // Create New Tube
+                        tubes.push(PaletteEntry::new(ana.average_color, ana.variance));
+                        tubes.len() - 1
+                    } else {
+                        // Find Closest Tube
+                        let mut best_t = 0;
+                        let mut min_d = u32::MAX;
+                        for (t_i, t_entry) in tubes.iter().enumerate() {
+                            let (t_avg, _) = t_entry.avg();
+                            let d = ana.average_color.dist_lab(&t_avg);
+                            if d < min_d {
+                                min_d = d;
+                                best_t = t_i;
+                            }
+                        }
+                        best_t
+                    };
+
+                    palette_to_tube.insert(idx, new_tid);
+                    // println!("DEBUG: Palette {} mapped to Tube {} (New? {})", idx, new_tid, tubes.len() <= max_phys_tubes);
+                    new_tid
+                };
+
+                // Update Tube Stats (Weighted Average)
+                if !is_empty_image {
+                    // Note: We might want to use a rolling average or just sum?
+                    // PaletteEntry supports accumulation.
+                    // But we need to be careful not to double count if we re-use PaletteEntry.
+                    // Since `tubes` is a separate Vec, we can just `add`.
+                    if tube_id < tubes.len() {
+                        tubes[tube_id].add(ana.average_color, ana.variance);
+                    }
+                }
+                // ------------------------------
+
                 *palette_owners
                     .entry(idx)
                     .or_default()
                     .entry(truth_category.clone())
                     .or_default() += 1;
 
-                assignments.push((filename.clone(), idx, truth_category.clone(), is_ignored));
+                assignments.push((
+                    filename.clone(),
+                    idx,
+                    truth_category.clone(),
+                    is_empty_image,
+                ));
 
-                if !is_ignored {
+                if !is_empty_image {
                     valid_dataset_size += 1;
                 }
 
                 // Debug Info
-                let (center, c_var) = palette.get_entry(idx).unwrap().avg();
+                let (center, _) = palette.get_entry(idx).unwrap().avg();
                 let dist_lab = ana.average_color.dist_lab(&center);
-                let var_diff = (ana.variance as i64 - c_var as i64).abs();
-                let dist_var = (var_diff / 10) as u32; // Use actual weight 1/10
                 println!(
-                    "DEBUG: {} ({}) -> P{} (L:{:?} V:{}) => D_Lab:{} D_Var:{} Tot:{}",
+                    "DEBUG: {} ({}) -> P{} -> Tube {} (L:{:?}) => D:{}",
                     filename,
                     truth_category,
                     idx,
+                    tube_id,
                     center.to_lab(),
-                    c_var,
-                    dist_lab,
-                    dist_var,
-                    dist_lab + dist_var
+                    dist_lab
                 );
 
                 report_palettes.entry(idx).or_default().push(html_entry);
             } else {
                 palette_full_errors += 1;
-                if !is_ignored {
-                    valid_dataset_size += 1;
-                }
+                valid_dataset_size += 1;
                 println!("Full Palette Error: {}", filename);
                 unclassified_images.push(html_entry);
             }
@@ -302,8 +292,9 @@ fn main() {
             empty_count += 1;
             let abs_path = fs::canonicalize(path).unwrap();
 
-            if !is_ignored {
+            if !is_empty_image {
                 valid_dataset_size += 1;
+                collision_errors += 1; // False Negative
             }
 
             filtered_images.push(format!(
@@ -329,20 +320,19 @@ fn main() {
     }
 
     // Evaluate Assignments
-    for (fname, pidx, truth, is_ignored) in assignments {
-        if is_ignored {
+    for (fname, pidx, truth, is_empty_img) in assignments {
+        if is_empty_img {
+            correct_assignments += 1;
             continue;
-        } // Exclude from Accuracy
+        }
 
         let predicted_owner = p_owners.get(&pidx).unwrap();
-        // Exception: Handle Palette merging? (e.g. White splits)
-        // For now, Strict Majority Vote Ownership.
 
         if predicted_owner == &truth {
             correct_assignments += 1;
         } else {
             collision_errors += 1;
-            let abs_path = fs::canonicalize(format!("image_data/{}/{}", truth, fname))
+            let abs_path = fs::canonicalize(data_dir.join(format!("{}/{}", truth, fname)))
                 .unwrap_or_else(|_| Path::new("?").to_path_buf());
             let (center, _) = palette
                 .get(pidx)
@@ -358,47 +348,78 @@ fn main() {
     println!("Total Processed: {}", total_processed);
     println!("Empty / Rejected: {}", empty_count);
     println!("Valid Dataset Size: {}", valid_dataset_size);
-    println!("Assigned Correctly: {}", correct_assignments);
+    println!("Assigned Correctly (Inc. Empty): {}", correct_assignments);
     println!("Assigned Incorrectly (Collisions): {}", collision_errors);
     println!("Unclassified (Palette Full): {}", palette_full_errors);
 
     if valid_dataset_size > 0 {
         let accuracy = (correct_assignments as f32 / valid_dataset_size as f32) * 100.0;
-        println!("STRICT ACCURACY (Correct / Valid): {:.2}%", accuracy);
+        println!("ACCURACY: {:.2}%", accuracy);
     }
 
     // Write Report
-    writeln!(report_file, "<h2>Simulation Report</h2>").unwrap();
+    writeln!(
+        report_file,
+        "<h2>Simulation Report (Online Clustering)</h2>"
+    )
+    .unwrap();
     if valid_dataset_size > 0 {
         writeln!(
             report_file,
-            "<p><b>Strict Accuracy: {:.2}%</b> ({} / {})</p>",
+            "<p><b>Accuracy: {:.2}%</b> ({} / {})</p>",
             (correct_assignments as f32 / valid_dataset_size as f32) * 100.0,
             correct_assignments,
             valid_dataset_size
         )
         .unwrap();
     }
-    writeln!(report_file, "<p>Ignored Entries: {}</p>", IGNORE_LIST.len()).unwrap();
+    writeln!(
+        report_file,
+        "<p>Palettes Created: {} | Tubes Used: {}</p>",
+        report_palettes.len(),
+        tubes.len()
+    )
+    .unwrap();
 
-    // Write Palettes
-    writeln!(report_file, "<div style='display:flex; flex-wrap:wrap'>").unwrap();
-    let mut sorted_indices: Vec<_> = report_palettes.keys().collect();
-    sorted_indices.sort();
+    // Group Palettes by Tube for Report
+    let mut tube_groups: HashMap<usize, Vec<usize>> = HashMap::new();
+    for (pidx, tid) in &palette_to_tube {
+        tube_groups.entry(*tid).or_default().push(*pidx);
+    }
 
-    for idx in sorted_indices {
-        let entries = &report_palettes[idx];
-        let owner = p_owners.get(idx).unwrap_or(&"unknown".to_string()).clone();
+    let mut sorted_tubes: Vec<usize> = tube_groups.keys().cloned().collect();
+    sorted_tubes.sort();
+
+    for tube_idx in sorted_tubes {
+        let palette_indices = &tube_groups[&tube_idx];
+
+        let (t_avg, _) = tubes[tube_idx].avg();
         writeln!(
             report_file,
-            "<div class='palette' style='border-color: #777'><h3>Palette {} ({})</h3>",
-            idx, owner
+            "<div style='border: 2px solid #555; padding: 10px; margin: 10px; background: #333;'>"
         )
         .unwrap();
-        for html in entries {
-            writeln!(report_file, "{}", html).unwrap();
+        writeln!(report_file, "<h2 style='margin-top:0'>Tube {} ({} Palettes) - Avg: <span class='color-swatch' style='background-color:rgb({},{},{})'></span></h2><div style='display:flex; flex-wrap:wrap'>", 
+            tube_idx + 1, palette_indices.len(), t_avg.r, t_avg.g, t_avg.b).unwrap();
+
+        let mut sorted_p_indices = palette_indices.clone();
+        sorted_p_indices.sort();
+
+        for idx in sorted_p_indices {
+            let entries = &report_palettes[&idx];
+            let owner = p_owners.get(&idx).unwrap_or(&"unknown".to_string()).clone();
+            writeln!(
+                report_file,
+                "<div class='palette' style='border-color: #777'><h3>Palette {} ({})</h3>",
+                idx, owner
+            )
+            .unwrap();
+            for html in entries {
+                writeln!(report_file, "{}", html).unwrap();
+            }
+            writeln!(report_file, "</div>").unwrap();
         }
-        writeln!(report_file, "</div>").unwrap();
+        writeln!(report_file, "</div></div>").unwrap();
     }
 
     if !unclassified_images.is_empty() {
