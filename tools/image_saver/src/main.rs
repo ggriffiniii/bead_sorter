@@ -14,6 +14,9 @@ struct Args {
 
     #[arg(short, long, default_value_t = 115200)]
     baud: u32,
+
+    #[arg(short, long, default_value = "images")]
+    output: String,
 }
 
 const WIDTH: usize = 40;
@@ -23,7 +26,8 @@ fn main() {
     let args = Args::parse();
 
     // Create images directory
-    std::fs::create_dir_all("images").unwrap();
+    // Create images directory
+    std::fs::create_dir_all(&args.output).unwrap();
 
     let (tx, rx): (mpsc::Sender<Vec<u8>>, Receiver<Vec<u8>>) = mpsc::channel();
 
@@ -59,7 +63,8 @@ fn main() {
             match rx.try_recv() {
                 Ok(frame_data) => {
                     // Convert frame to ARGB buffer and save to disk
-                    process_frame(&frame_data, &mut buffer);
+                    // Convert frame to ARGB buffer and save to disk
+                    process_frame(&frame_data, &mut buffer, &args.output);
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => return,
@@ -154,7 +159,7 @@ fn serial_loop(args: Args, tx: mpsc::Sender<Vec<u8>>) {
     }
 }
 
-fn process_frame(data: &[u8], buffer: &mut [u32]) {
+fn process_frame(data: &[u8], buffer: &mut [u32], output_dir: &str) {
     let width = WIDTH as u32;
     let height = HEIGHT as u32;
     let mut img = RgbImage::new(width, height);
@@ -190,7 +195,7 @@ fn process_frame(data: &[u8], buffer: &mut [u32]) {
 
     // Save to disk
     let timestamp = chrono::Utc::now().timestamp_millis();
-    let name = format!("images/bead_{}.png", timestamp);
+    let name = format!("{}/bead_{}.png", output_dir, timestamp);
     match img.save(&name) {
         Ok(_) => println!("Saved: {}", name),
         Err(e) => println!("Error saving image: {}", e),

@@ -31,6 +31,7 @@ use crate::neopixel::Neopixel;
 use crate::servo::{Channel, Servo};
 use crate::switch::Switch;
 use bead_sorter_bsp::Board;
+use sorter_logic::{analyze_image, Palette, PaletteMatch};
 
 const HOPPER_MIN: u16 = 500;
 const HOPPER_MAX: u16 = 2266;
@@ -145,22 +146,14 @@ async fn main(_spawner: Spawner) {
 
     let demo_fut = async {
         // Wait for USB connection (DTR)
-        // USB connection checks removed to allow auto-start.
-        // led.set_low(); // GPIO method removed
         // Ensure LED is ON (50%)
         led.set_config(&led_config);
         Timer::after(Duration::from_millis(100)).await;
 
-        // Camera Init removed from log
         Timer::after(Duration::from_millis(300)).await;
 
-        // Scan Logic removed from log
-
         // Initialize Ov7670 Camera
-        // Initialize Ov7670 Camera (Verbose log removed)
-
         // Pass board.cam_pins and board.cam_dma to the new struct
-        // We use full path or imported path
         let mut camera = crate::camera::ov7670::Ov7670::new(
             i2c,
             &mut pio.common,
@@ -171,10 +164,8 @@ async fn main(_spawner: Spawner) {
         )
         .await;
 
-        // Enable Color Bar Test Pattern for debugging
-        // camera.enable_test_pattern().await;
-
-        // Buffer capture logs removed
+        // Sorting State
+        let mut palette: Palette<30> = Palette::new();
 
         // Sorting Loop
         if class.dtr() {
@@ -227,20 +218,63 @@ async fn main(_spawner: Spawner) {
             let buf_bytes =
                 unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4) };
 
-            // Write in chunks to avoid overwhelming USB buffer if necessary,
-            // though embassy-usb handles segmentation usually.
-            // Max packet is 64, but write_packet handles multi-packet transfers?
-            // "write_packet" implies a single packet. Let's chop it to be safe.
+            // Write in chunks to avoid overwhelming USB buffer if necessary
             for chunk in buf_bytes.chunks(64) {
                 let _ = class.write_packet(chunk).await;
             }
 
             let _ = class.write_packet(b"Captured\r\n").await;
 
-            // Mock Classification
-            let timestamp = embassy_time::Instant::now().as_millis();
-            let tube_index = (timestamp % 30) as u8; // Cycle through all 30 tubes
-            let tube_index = 0;
+            // Real Classification
+            let analysis = analyze_image(buf_bytes, 40, 30); // 40x30 resolution
+
+            // Default to Bin 0 (Waste/Unclassified) if analysis fails
+            let mut tube_index = 0;
+
+            // --- Palette to Tube Mapping ---
+            // Logical Palettes (0..29) -> Physical Tubes (0..29)
+            // Default: 1-to-1 mapping (Logical Palette i -> Tube i)
+            // This map can be modified at runtime (e.g. via USB command) to merge palettes.
+            // For example, if P1 and P6 are both "White", set tube_map[6] = 1 to route both to Tube 1.
+            let mut tube_map: [u8; 30] = [0; 30];
+            for i in 0..30 {
+                tube_map[i] = i as u8;
+            }
+
+            if let Some(ana) = analysis {
+                // Adaptive Learning (Conservative)
+                let threshold = 200;
+                let learn_threshold = 50;
+
+                match palette.match_color(&ana.average_color, ana.variance, threshold) {
+                    PaletteMatch::Match(i) => {
+                        // Only update if very close to prevent drift
+                        if let Some(current) = palette.get(i) {
+                            if ana.average_color.dist(&current) < learn_threshold {
+                                palette.add_sample(i, &ana.average_color, ana.variance);
+                            }
+                        }
+                        if i < tube_map.len() {
+                            tube_index = tube_map[i];
+                        }
+                    }
+                    PaletteMatch::NewEntry(i) => {
+                        if i < tube_map.len() {
+                            tube_index = tube_map[i];
+                        }
+                    }
+                    PaletteMatch::Full => {
+                        // Palette full, use Bin 0 as overflow
+                        tube_index = 0;
+                    }
+                }
+            }
+
+            // Send classification info
+            // let mut msg = String::<64>::new();
+            // write!(&mut msg, "Bin: {}\r\n", tube_index).unwrap();
+            // let _ = class.write_packet(msg.as_bytes()).await;
+
             let chute_target = get_chute_pos(tube_index);
 
             // Calculate Hopper Row
