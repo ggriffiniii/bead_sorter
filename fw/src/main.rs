@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
-use defmt_rtt as _;
 use embassy_executor::Spawner;
+use embassy_futures::join::join;
 use embassy_rp::bind_interrupts;
 use embassy_rp::gpio::{Input, Pull};
 use embassy_rp::peripherals::{PIO0, USB};
@@ -10,28 +10,24 @@ use embassy_rp::pio::Pio;
 use embassy_rp::pio_programs::ws2812::{PioWs2812, PioWs2812Program};
 use embassy_rp::pwm::{Config as PwmConfig, Pwm};
 use embassy_rp::usb;
-// use embassy_rp::Peripheral;
-use embassy_futures::join::join;
-use embassy_time::{with_timeout, Duration, Timer};
+use embassy_time::{Duration, Timer};
 use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
-use smart_leds::RGB8;
-// use smart_leds::SmartLedsWrite;
-use core::fmt::Write;
-use heapless::String;
-use {defmt_rtt as _, panic_probe as _};
+use panic_probe as _;
+use static_cell::{ConstStaticCell, StaticCell};
 
 mod camera;
 mod neopixel;
 mod servo;
+mod sorter;
 mod switch;
 
-// use crate::camera::dvp::Dvp; // Unused
+use crate::camera::ov7670::Ov7670;
 use crate::neopixel::Neopixel;
-
 use crate::servo::{Channel, Servo};
+use crate::sorter::BeadSorter;
 use crate::switch::Switch;
+
 use bead_sorter_bsp::Board;
-use sorter_logic::{analyze_image, Palette, PaletteMatch};
 
 const HOPPER_MIN: u16 = 500;
 const HOPPER_MAX: u16 = 2266;
@@ -61,8 +57,23 @@ bind_interrupts!(struct Irqs {
     I2C0_IRQ => embassy_rp::i2c::InterruptHandler<embassy_rp::peripherals::I2C0>;
 });
 
+static USB_CDC_ACM_STATE: StaticCell<State> = StaticCell::new();
+static USB_CONFIG_DESC_BUF: ConstStaticCell<[u8; 256]> = ConstStaticCell::new([0u8; 256]);
+static USB_BOS_DESC_BUF: ConstStaticCell<[u8; 256]> = ConstStaticCell::new([0u8; 256]);
+static USB_CONTROL_BUF_BUF: ConstStaticCell<[u8; 64]> = ConstStaticCell::new([0u8; 64]);
+static USB_MSOS_DESC_BUF: ConstStaticCell<[u8; 256]> = ConstStaticCell::new([0u8; 256]);
+static USB_DATA_CDC_ACM_STATE: StaticCell<State> = StaticCell::new();
+
+#[embassy_executor::task]
+async fn usb_defmt_logger(
+    mut driver: embassy_usb::UsbDevice<'static, embassy_rp::usb::Driver<'static, USB>>,
+    tx: embassy_usb::class::cdc_acm::Sender<'static, embassy_rp::usb::Driver<'static, USB>>,
+) {
+    join(driver.run(), defmt_embassy_usbserial::logger(tx)).await;
+}
+
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
     let board = Board::new(p);
 
@@ -75,25 +86,28 @@ async fn main(_spawner: Spawner) {
     config.max_power = 100;
     config.max_packet_size_0 = 64;
 
-    let mut state = State::new();
-    let mut config_desc = [0u8; 256];
-    let mut bos_desc = [0u8; 256];
-    let mut control_buf = [0u8; 64];
-    let mut msos_desc = [0u8; 256];
+    let state = USB_CDC_ACM_STATE.init(State::new());
 
     let mut builder = embassy_usb::Builder::new(
         driver,
         config,
-        &mut config_desc,
-        &mut bos_desc,
-        &mut msos_desc,
-        &mut control_buf,
+        USB_CONFIG_DESC_BUF.take(),
+        USB_BOS_DESC_BUF.take(),
+        USB_MSOS_DESC_BUF.take(),
+        USB_CONTROL_BUF_BUF.take(),
     );
 
-    let mut class = CdcAcmClass::new(&mut builder, &mut state, 64);
-    let mut usb = builder.build();
+    let mut class = CdcAcmClass::new(&mut builder, state, 64);
+    let (tx, _rx) = class.split();
 
-    // --- Hardware Initialization ---
+    let data_state = USB_DATA_CDC_ACM_STATE.init(State::new());
+    let data_class = CdcAcmClass::new(&mut builder, data_state, 64);
+    let (mut data_tx, _data_rx) = data_class.split();
+
+    let usb = builder.build();
+    spawner.must_spawn(usb_defmt_logger(usb, tx));
+
+    defmt::info!("USB Logging initialized");
 
     // 1. PIO0 (Shared by Neopixel and DVP)
     let mut pio = Pio::new(board.neopixel_pio, Irqs);
@@ -124,7 +138,7 @@ async fn main(_spawner: Spawner) {
 
     // 4. Pause Switch
     let pause_input = Input::new(board.pause_button, Pull::Up);
-    let mut switch = Switch::new(pause_input);
+    let switch = Switch::new(pause_input);
 
     // 5. Camera LED (PWM Slice 3 B, Pin 23)
     let mut led_config = PwmConfig::default();
@@ -138,23 +152,26 @@ async fn main(_spawner: Spawner) {
     i2c_config.frequency = 100_000;
     i2c_config.sda_pullup = false;
     i2c_config.scl_pullup = false;
-    let mut i2c =
+    let i2c =
         embassy_rp::i2c::I2c::new_async(board.i2c0, board.i2c_scl, board.i2c_sda, Irqs, i2c_config);
 
     // --- Tasks ---
-    let usb_fut = usb.run();
-
-    let demo_fut = async {
-        // Wait for USB connection (DTR)
+    let main_fut = async {
+        Timer::after(Duration::from_millis(10000)).await;
+        //panic!("test panic");
         // Ensure LED is ON (50%)
         led.set_config(&led_config);
-        Timer::after(Duration::from_millis(100)).await;
 
-        Timer::after(Duration::from_millis(300)).await;
+        // Homing
+        let chutes_fut = chutes.move_to(CHUTE_SLICE_POSITIONS[7]);
+        let hopper_align_fut = async {
+            hopper.move_to(HOPPER_DROP_POS).await;
+            Timer::after(Duration::from_millis(300)).await;
+        };
+        join(chutes_fut, hopper_align_fut).await;
 
         // Initialize Ov7670 Camera
-        // Pass board.cam_pins and board.cam_dma to the new struct
-        let mut camera = crate::camera::ov7670::Ov7670::new(
+        let mut camera = Ov7670::new(
             i2c,
             &mut pio.common,
             pio.sm1,
@@ -165,15 +182,7 @@ async fn main(_spawner: Spawner) {
         .await;
 
         // Sorting State
-        let mut palette: Palette<128> = Palette::new();
-        let mut tubes: heapless::Vec<sorter_logic::PaletteEntry, 30> = heapless::Vec::new();
-        // Index is PaletteID, Value is TubeID. 0xFF = None
-        let mut palette_to_tube: [u8; 128] = [0xFF; 128];
-
-        // Sorting Loop
-        if class.dtr() {
-            let _ = class.write_packet(b"Starting Sorter Loop...\r\n").await;
-        }
+        let mut sorter = BeadSorter::new();
 
         loop {
             if switch.is_active() {
@@ -181,12 +190,8 @@ async fn main(_spawner: Spawner) {
                 // Turn OFF LED when paused
                 led_config.compare_b = 0;
                 led.set_config(&led_config);
-                if class.dtr() {
-                    let _ =
-                        with_timeout(Duration::from_millis(5), class.write_packet(b"Paused\r\n"))
-                            .await;
-                }
-                Timer::after(Duration::from_millis(500)).await;
+                defmt::info!("Paused");
+                Timer::after(Duration::from_millis(1000)).await;
                 continue;
             }
             // Turn ON LED (50%) when running
@@ -211,105 +216,38 @@ async fn main(_spawner: Spawner) {
             let mut buf = [0u32; 600];
             let _ = camera.capture(&mut buf).await;
 
-            // RESTORE BINARY STREAM
-            // Send Image Header: [0xBE, 0xAD, 0x1F, 0x01]
-            let header = [0xBE, 0xAD, 0x1F, 0x01];
-            let _ = class.write_packet(&header).await;
-
-            // Send Image Data
-            // Safety: Transmuting valid u32 slice to u8 slice for transmission.
-            let buf_bytes =
-                unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * 4) };
-
-            // Write in chunks to avoid overwhelming USB buffer if necessary
-            for chunk in buf_bytes.chunks(64) {
-                let _ = class.write_packet(chunk).await;
+            // Safety: Transmuting valid u32 slice to u8 slice.
+            // The helper function keeps the lifetimes tied together.
+            unsafe fn u32_slice_to_u8_slice(input: &[u32]) -> &[u8] {
+                unsafe { core::slice::from_raw_parts(input.as_ptr() as *const u8, input.len() * 4) }
             }
+            let buf_bytes = unsafe { u32_slice_to_u8_slice(&buf) };
 
-            let _ = class.write_packet(b"Captured\r\n").await;
+            if data_tx.dtr() {
+                // If host is connected to second ACM port, send image data
+                // Image data is a magic u32 followed by 1200 bytes of rgb565
+                // (30x40 pixels)
+                let header = [0xBE, 0xAD, 0x1F, 0x01];
+                let _ = data_tx.write_packet(&header).await;
 
-            let analysis = analyze_image(buf_bytes, 40, 30); // 40x30 resolution
-
-            // Default to Bin 0 (Waste/Unclassified) if analysis fails
-            let mut tube_index = 0;
-
-            if let Some(ana) = analysis {
-                // Adaptive Learning
-                let match_result = palette.match_color(&ana.average_color, ana.variance, 15);
-
-                let p_idx = match match_result {
-                    PaletteMatch::Match(i) => Some(i),
-                    PaletteMatch::NewEntry(i) => Some(i),
-                    PaletteMatch::Full => None, // Palette Full -> Unclassified (Tube 0)
-                };
-
-                if let Some(idx) = p_idx {
-                    // Update Learning
-                    palette.add_sample(idx, &ana.average_color, ana.variance);
-
-                    // Map to Tube
-                    let tid = if palette_to_tube[idx] != 0xFF {
-                        palette_to_tube[idx] as usize
-                    } else {
-                        // New Palette, assign tube
-                        if tubes.len() < 30 {
-                            // New Tube
-                            // Note: Firmware needs PaletteEntry struct too.
-                            // Assuming sorter_logic exposes PaletteEntry publicly (it does).
-                            // But struct construction might differ without 'new'?
-                            // sorter_logic::PaletteEntry::new(rgb, var)
-                            // We need to import PaletteEntry.
-                            let entry =
-                                sorter_logic::PaletteEntry::new(ana.average_color, ana.variance);
-                            let _ = tubes.push(entry);
-                            tubes.len() - 1
-                        } else {
-                            // Find closest tube
-                            let mut best_t = 0;
-                            let mut min_d = u32::MAX;
-                            for (t_i, t_entry) in tubes.iter().enumerate() {
-                                let (t_avg, _) = t_entry.avg();
-                                let d = ana.average_color.dist_lab(&t_avg);
-                                if d < min_d {
-                                    min_d = d;
-                                    best_t = t_i;
-                                }
-                            }
-                            best_t
-                        }
-                    };
-
-                    if idx < 128 {
-                        palette_to_tube[idx] = tid as u8;
-                    }
-
-                    // Update Tube Stats
-                    if tid < tubes.len() {
-                        tubes[tid].add(ana.average_color, ana.variance);
-                    }
-
-                    tube_index = tid as u8;
+                // Write in chunks to avoid overwhelming USB buffer if necessary
+                for chunk in buf_bytes.chunks(64) {
+                    let _ = data_tx.write_packet(chunk).await;
                 }
             }
 
-            // Send classification info
-            // let mut msg = String::<64>::new();
-            // let _ = class.write_packet(msg.as_bytes()).await;
-
+            let tube_index = sorter.get_tube_for_image(buf_bytes, 40, 30).unwrap_or(0);
             let chute_target = get_chute_pos(tube_index);
 
-            // Calculate Hopper Row
-            // Formula: (tube / 15) * 2 + (tube % 15) & 1 ?
-            // User formula: (tube_idx / 15) << 1 | ((tube_idx % 15) & 1)
-            // (0..14) -> 0 -> row 0 or 1.
-            // (15..29) -> 1 -> row 2 or 3.
             let row_index = ((tube_index / 15) << 1) | ((tube_index % 15) & 1);
+            defmt::info!(
+                "Dropping bead into tube: {} row: {} chute: {}",
+                tube_index,
+                row_index,
+                chute_target
+            );
             let drop_row = HOPPER_ROW_POSITIONS[row_index as usize];
 
-            // 4. Move Chute & 5. Align Hopper (Concurrent)
-            // Ensure Chutes are done (750ms) before Drops proceed.
-            // Hopper align takes 500ms + 200ms wait = 700ms.
-            // So join will finish at 750ms (dominated by chutes).
             let chutes_fut = chutes.move_to(chute_target);
             let hopper_align_fut = async {
                 hopper.move_to(drop_row).await;
@@ -318,11 +256,10 @@ async fn main(_spawner: Spawner) {
 
             join(chutes_fut, hopper_align_fut).await;
 
-            // 6. Retract/Drop
             hopper.move_to(HOPPER_DROP_POS).await;
-            Timer::after(Duration::from_millis(300)).await;
+            Timer::after(Duration::from_millis(350)).await;
         }
     };
 
-    futures::join!(usb_fut, demo_fut);
+    main_fut.await
 }
