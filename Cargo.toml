@@ -1,3 +1,4 @@
 [workspace]
-members = ["bsp", "fw", "sorter_logic", "tools/image_saver", "tools/manual_sorter"]
+members = ["sorter_logic", "tools/image_saver", "tools/manual_sorter"]
+exclude = ["fw", "bsp"]
 resolver = "2"

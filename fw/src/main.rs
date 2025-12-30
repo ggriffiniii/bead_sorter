@@ -156,8 +156,6 @@ async fn main(spawner: Spawner) {
 
     // --- Tasks ---
     let main_fut = async {
-        Timer::after(Duration::from_millis(10000)).await;
-        //panic!("test panic");
         // Ensure LED is ON (50%)
         led.set_config(&led_config);
 

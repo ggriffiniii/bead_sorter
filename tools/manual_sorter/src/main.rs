@@ -1,14 +1,13 @@
 use axum::{
-    extract::{Path, State},
+    extract::State,
     http::StatusCode,
-    response::{Html, IntoResponse, Json},
+    response::{Html, Json},
     routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
 use sorter_logic::{analyze_image_debug, AnalysisConfig, Palette, PaletteMatch};
 use std::{
-    collections::HashMap,
     net::SocketAddr,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -106,7 +105,7 @@ fn initial_sort(path: &PathBuf) -> Vec<Bead> {
     for entry in WalkDir::new(path).min_depth(1).max_depth(10) {
         let entry = entry.unwrap();
         let p = entry.path();
-        if p.extension().map_or(false, |e| e == "png") {
+        if p.extension().is_some_and(|e| e == "png") {
             // Load Image
             let img = match image::open(p) {
                 Ok(i) => i.into_rgb8(),

@@ -64,6 +64,12 @@ pub struct Palette<const N: usize> {
     count: usize,
 }
 
+impl<const N: usize> Default for Palette<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const N: usize> Palette<N> {
     pub const fn new() -> Self {
         Self {
@@ -95,10 +101,10 @@ impl<const N: usize> Palette<N> {
             }
         }
 
-        if let Some(idx) = best_idx {
-            if min_dist < threshold {
-                return PaletteMatch::Match(idx);
-            }
+        if let Some(idx) = best_idx
+            && min_dist < threshold
+        {
+            return PaletteMatch::Match(idx);
         }
 
         if self.count < N {
@@ -112,10 +118,10 @@ impl<const N: usize> Palette<N> {
     }
 
     pub fn add_sample(&mut self, index: usize, rgb: &Rgb, variance: u32) {
-        if index < N {
-            if let Some(entry) = &mut self.colors[index] {
-                entry.add(*rgb, variance);
-            }
+        if index < N
+            && let Some(entry) = &mut self.colors[index]
+        {
+            entry.add(*rgb, variance);
         }
     }
 
@@ -133,6 +139,10 @@ impl<const N: usize> Palette<N> {
 
     pub fn len(&self) -> usize {
         self.count
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
     }
 }
 
@@ -475,13 +485,12 @@ pub fn analyze_image_debug(
             let mean_b = (sum_b / p_count as u32) as i32;
 
             // 2. Calculate Distance from Mean for each pixel
-            for i in 0..p_count {
-                let p = pixels[i].0;
-                let rgb = Rgb::from_rgb565(p);
+            for (p, dist, _) in pixels.iter_mut().take(p_count) {
+                let rgb = Rgb::from_rgb565(*p);
                 let dr = (rgb.r as i32 - mean_r).pow(2);
                 let dg = (rgb.g as i32 - mean_g).pow(2);
                 let db = (rgb.b as i32 - mean_b).pow(2);
-                pixels[i].1 = (dr + dg + db) as u32;
+                *dist = (dr + dg + db) as u32;
             }
 
             // 3. Sort by Distance (Simple Insertion Sort for small N)
@@ -503,8 +512,7 @@ pub fn analyze_image_debug(
             let mut f_sum_sq_g = 0u32;
             let mut f_sum_sq_b = 0u32;
 
-            for i in 0..keep_count {
-                let p = pixels[i].0;
+            for (p, _, m_idx) in pixels.iter().copied().take(keep_count) {
                 let rgb = Rgb::from_rgb565(p);
                 let r = rgb.r as u32;
                 let g = rgb.g as u32;
@@ -518,12 +526,10 @@ pub fn analyze_image_debug(
                 f_sum_sq_b += b * b;
 
                 // Update Mask with Kept Pixels
-                if let Some(m) = &mut mask {
-                    let m_idx = pixels[i].2;
-                    if m_idx < m.len() {
+                if let Some(m) = &mut mask
+                    && m_idx < m.len() {
                         m[m_idx] = 1; // Green
                     }
-                }
             }
 
             let f_mean_r = f_sum_r / keep_count as u32;
@@ -541,11 +547,6 @@ pub fn analyze_image_debug(
             let f_var_b = (f_sum_sq_b / keep_count as u32).saturating_sub(f_mean_b * f_mean_b);
             let f_total_variance = f_var_r + f_var_g + f_var_b;
 
-            // Debug Print for high variance
-            // if f_total_variance > 800 {
-            //      let _ = std::io::Write::write_fmt(&mut std::io::stdout(), format_args!("HighVariance: Rvar={} Gvar={} Bvar={} Tot={}\n", f_var_r, f_var_g, f_var_b, f_total_variance));
-            // }
-
             best_stats = Some((f_avg, keep_count as u32, f_total_variance));
         } else {
             best_stats = None; // No pixels found in the best ring, so no stats
@@ -553,11 +554,11 @@ pub fn analyze_image_debug(
     }
 
     if let Some((avg, count, var)) = best_stats {
-        return Some(BeadAnalysis {
+        Some(BeadAnalysis {
             average_color: avg,
             pixel_count: count,
             variance: var,
-        });
+        })
     } else {
         None
     }

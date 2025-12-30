@@ -129,10 +129,10 @@ fn serial_loop(args: Args, tx: mpsc::Sender<Vec<u8>>) {
 
                             // Frame size: 40 * 30 * 2 = 2400 bytes
                             let mut frame_buf = vec![0u8; WIDTH * HEIGHT * 2];
-                            if let Ok(_) = port.read_exact(&mut frame_buf) {
+                            if port.read_exact(&mut frame_buf).is_ok() {
                                 println!("RX OK.");
                                 // Send to main thread
-                                if let Err(_) = tx.send(frame_buf) {
+                                if tx.send(frame_buf).is_err() {
                                     break;
                                 }
                             } else {
