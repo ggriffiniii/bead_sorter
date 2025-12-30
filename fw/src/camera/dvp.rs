@@ -2,6 +2,7 @@ use embassy_rp::pio::{
     Common, Config, Direction, LoadedProgram, Pin, ShiftDirection, StateMachine, StateMachineRx,
 };
 
+#[allow(dead_code)]
 pub struct Dvp<'d, T: embassy_rp::pio::Instance, const S: usize> {
     sm: StateMachine<'d, T, S>,
     d0: Pin<'d, T>,
@@ -54,8 +55,7 @@ impl<'d, T: embassy_rp::pio::Instance, const S: usize> Dvp<'d, T, S> {
         // DVP Capture Program
         // 1. Wait for VSYNC (Start of Frame) - Rising Edge
         // 2. Wait for HREF (Start of Line) - High
-        // 3. Loop PCLK cycles to capture data
-        // 4. Exit loop when HREF goes low (handled by wrap logic implicitly? No, wait 1 gpio 10 handles start, where is end?)
+        // 3. Loop PCLK cycles to capture data, until the state machine is stopped externally.
 
         // Original ASM:
         // wait 0 gpio 11

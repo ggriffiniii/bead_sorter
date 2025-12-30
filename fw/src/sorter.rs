@@ -1,9 +1,10 @@
 use heapless::Vec;
 use sorter_logic::{analyze_image, Palette, PaletteEntry, PaletteMatch};
 
+const TUBE_COUNT: usize = 30;
 pub struct BeadSorter {
     palette: Palette<128>,
-    tubes: Vec<PaletteEntry, 30>,
+    tubes: Vec<PaletteEntry, TUBE_COUNT>,
     palette_to_tube: [u8; 128],
 }
 
@@ -38,7 +39,7 @@ impl BeadSorter {
             defmt::info!("bead matched palette entry: {}, tube: {}", p_idx, t_idx);
             t_idx
         } else {
-            if self.tubes.len() < 30 {
+            if self.tubes.len() < self.tubes.capacity() {
                 defmt::info!(
                     "New Palette Entry: {} assigning to empty tube: {}",
                     p_idx,

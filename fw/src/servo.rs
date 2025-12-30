@@ -1,13 +1,16 @@
 use embassy_rp::pwm::{Pwm, SetDutyCycle};
+
 use embassy_time::{Duration, Instant, Timer};
 
 pub enum Channel {
     A,
+    #[allow(dead_code)]
     B,
 }
 
 pub struct Servo<'d> {
     pwm: Pwm<'d>,
+    #[allow(unused)]
     channel: Channel, // Kept for reference, though new_output_a/b might bind it.
     min_us: u16,
     max_us: u16,

@@ -1,6 +1,5 @@
 use embassy_rp::gpio::Input;
 
-#[allow(dead_code)]
 pub struct Switch<'d> {
     input: Input<'d>,
 }

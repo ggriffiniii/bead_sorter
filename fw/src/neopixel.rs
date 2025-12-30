@@ -1,11 +1,12 @@
 use embassy_rp::pio_programs::ws2812::{Grb, PioWs2812};
-use smart_leds::{SmartLedsWrite, RGB8};
-// use embassy_rp::Peripheral; // Using trait if available
+
+use smart_leds::RGB8;
 
 pub struct Neopixel<'d, const SM_IDX: usize, const N: usize> {
     driver: PioWs2812<'d, embassy_rp::peripherals::PIO0, SM_IDX, N, Grb>,
 }
 
+#[allow(dead_code)]
 impl<'d, const SM_IDX: usize, const N: usize> Neopixel<'d, SM_IDX, N> {
     pub fn new(driver: PioWs2812<'d, embassy_rp::peripherals::PIO0, SM_IDX, N, Grb>) -> Self {
         Self { driver }
@@ -15,7 +16,6 @@ impl<'d, const SM_IDX: usize, const N: usize> Neopixel<'d, SM_IDX, N> {
         self.driver.write(colors).await;
     }
 
-    #[allow(dead_code)]
     pub async fn set_color(&mut self, _r: u8, _g: u8, _b: u8) {
         // This only works if N=1.
         // If N > 1, we might need to fill array.

@@ -40,7 +40,6 @@ const HOPPER_DROP_POS: u16 = 1613;
 
 const CHUTES_MIN: u16 = 500;
 const CHUTES_MAX: u16 = 1167;
-const TUBE_COUNT: u8 = 30;
 
 const CHUTE_SLICE_POSITIONS: [u16; 15] = [
     545, 586, 632, 675, 718, 762, 802, 842, 879, 920, 958, 999, 1041, 1085, 1132,
@@ -97,7 +96,7 @@ async fn main(spawner: Spawner) {
         USB_CONTROL_BUF_BUF.take(),
     );
 
-    let mut class = CdcAcmClass::new(&mut builder, state, 64);
+    let class = CdcAcmClass::new(&mut builder, state, 64);
     let (tx, _rx) = class.split();
 
     let data_state = USB_DATA_CDC_ACM_STATE.init(State::new());
