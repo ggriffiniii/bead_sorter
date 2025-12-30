@@ -527,9 +527,10 @@ pub fn analyze_image_debug(
 
                 // Update Mask with Kept Pixels
                 if let Some(m) = &mut mask
-                    && m_idx < m.len() {
-                        m[m_idx] = 1; // Green
-                    }
+                    && m_idx < m.len()
+                {
+                    m[m_idx] = 1; // Green
+                }
             }
 
             let f_mean_r = f_sum_r / keep_count as u32;
